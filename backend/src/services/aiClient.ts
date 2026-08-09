@@ -1,0 +1,116 @@
+import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
+import { nextChatTurn } from './triage/engine.js';
+import type { ChatTurn } from './triage/engineTypes.js';
+import { extractiveSummary } from './reportSummarizer.js';
+
+export interface AiChatPayload {
+  conversation_id?: string;
+  patient_id?: string;
+  patient_context?: { age?: number | null; gender?: string | null; existing_conditions?: string[] };
+  messages: { role: string; text: string }[];
+  answers: { key: string; answer: string; rephrased?: boolean }[];
+}
+
+export interface AiSummaryResult {
+  ai_summary: unknown;
+  model_used: string;
+}
+
+type QuestionTurn = Extract<ChatTurn, { type: 'question' }>;
+type ResultTurn = Extract<ChatTurn, { type: 'result' }>;
+
+async function post(path: string, body: unknown): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), env.aiServiceTimeoutMs);
+  try {
+    const res = await fetch(env.aiServiceUrl + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error('AI service HTTP ' + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function aiServiceHealthy(): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch(env.aiServiceUrl + '/health', { signal: controller.signal });
+    clearTimeout(timer);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeTurn(data: unknown): ChatTurn {
+  if (!data || typeof data !== 'object') throw new Error('Unexpected AI response shape');
+  const d = data as {
+    type?: string;
+    question?: QuestionTurn['question'];
+    triage?: ResultTurn['triage'];
+  };
+  if (d.type === 'question' && d.question) {
+    return { type: 'question', question: d.question, done: false };
+  }
+  if (d.type === 'result' && d.triage) {
+    return { type: 'result', triage: d.triage };
+  }
+  throw new Error('Unexpected AI response shape');
+}
+
+export async function aiChat(payload: AiChatPayload): Promise<ChatTurn> {
+  try {
+    const data = await post('/ai/chat', payload);
+    return normalizeTurn(data);
+  } catch (err) {
+    logger.warn('AI service unavailable - using local triage engine: ' + (err as Error).message);
+    return nextChatTurn({
+      messages: payload.messages,
+      answers: payload.answers,
+      patient: payload.patient_context,
+    });
+  }
+}
+
+export async function aiTriage(payload: Omit<AiChatPayload, 'conversation_id'>): Promise<ChatTurn> {
+  try {
+    const data = await post('/ai/triage', payload);
+    return normalizeTurn(data);
+  } catch (err) {
+    logger.warn('AI service unavailable for triage - using local engine: ' + (err as Error).message);
+    return nextChatTurn({
+      messages: payload.messages,
+      answers: payload.answers,
+      patient: payload.patient_context,
+    });
+  }
+}
+
+export async function aiSummarizeReport(report: {
+  report_text: string;
+  doctor_diagnosis: string;
+}): Promise<AiSummaryResult> {
+  try {
+    const data = (await post('/summarize', {
+      text: report.report_text,
+      diagnosis: report.doctor_diagnosis,
+    })) as { ai_summary?: unknown; model_used?: string };
+    return {
+      ai_summary: data.ai_summary ?? extractiveSummary(report.report_text).ai_summary,
+      model_used: data.model_used ?? 'extractive-heuristic-v1',
+    };
+  } catch (err) {
+    logger.warn(
+      'AI service unavailable for summarization - using extractive fallback: ' +
+        (err as Error).message,
+    );
+    return extractiveSummary(report.report_text);
+  }
+}
