@@ -44,7 +44,7 @@ export default function AIChatScreen() {
     } else {
       const triage = turn.triage;
       addMessage({
-        id: 'result',
+        id: 'result-' + Date.now(),
         type: 'result',
         content: `**${triage.urgency.label}** — ${triage.reason}\n\n` +
           `Recommended: ${triage.recommended_specialties.map((s) => s.specialty).join(', ')}\n\n` +
@@ -54,7 +54,7 @@ export default function AIChatScreen() {
       });
       if (triage.emergency_flag) {
         addMessage({
-          id: 'emergency',
+          id: 'emergency-' + Date.now(),
           type: 'question',
           content: 'Please seek emergency medical attention immediately. Do you want to find nearby doctors?',
           options: [{ id: 'yes', key: 'emergency.yes', text: 'Find Doctors', emoji: 'ambulance' }],
