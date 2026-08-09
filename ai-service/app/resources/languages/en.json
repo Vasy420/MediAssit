@@ -162,7 +162,7 @@
     "cancelled": "Your appointment {appointment_id} has been cancelled.",
     "slots_intro": "Here are the available slots:",
     "slots_with_doctor": "Available slots with {doctor} on {date}:",
-    "more_slots": "... and {count} more slots.",
+    "more_slots": "... and {count} more slot(s): {slots}",
     "no_slots": "Sorry, there are no available slots on that day. Please choose another date."
   },
   "queue": {

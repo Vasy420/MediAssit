@@ -275,6 +275,20 @@ def next_chat_turn(messages: list[dict], answers: list[dict], patient: Optional[
     )
 
     cats = L.detect_categories(texts)
+
+    if not cats and answers:
+        seen_cats: set[str] = set()
+        for a in answers:
+            ak = a.get('key', '')
+            if ak == 'category':
+                continue
+            for cat, qlist in QUESTIONS.items():
+                if any(q.id == ak for q in qlist):
+                    seen_cats.add(cat)
+                    break
+        for c in seen_cats:
+            cats.append(c)
+
     if not cats and not answers:
         return {'type': 'question', 'question': build_category_question(), 'done': False}
 

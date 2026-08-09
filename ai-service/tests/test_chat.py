@@ -14,35 +14,28 @@ def test_unknown_text_asks_category_first(client):
 
 
 def test_knee_flow_targets_orthopedic_specialty(client):
-    turn = client.post('/ai/chat', json={
-        'messages': [{'role': 'patient', 'text': 'My knee hurts after I fell and now I cannot walk properly'}],
-        'answers': [],
-    }).json()
+    messages = [{'role': 'patient', 'text': 'My knee hurts after I fell and now I cannot walk properly'}]
+    answers: list[dict] = []
+
+    turn = client.post('/ai/chat', json={'messages': messages, 'answers': answers}).json()
     assert turn['type'] == 'question'
 
-    # 1. Answer severity = severe
-    turn = client.post('/ai/chat', json={
-        'messages': [],
-        'answers': [{'key': 'Q_bone_sev', 'answer': 'severe'}],
-    }).json()
+    answers.append({'key': 'Q_bone_sev', 'answer': 'severe'})
+    turn = client.post('/ai/chat', json={'messages': [], 'answers': answers}).json()
+
     if turn['type'] == 'question':
-        # 2. Answer fall/injury question
-        turn = client.post('/ai/chat', json={
-            'messages': [],
-            'answers': [{'key': 'Q_bone_cause', 'answer': 'fall'}],
-        }).json()
+        answers.append({'key': 'Q_bone_cause', 'answer': 'fall'})
+        turn = client.post('/ai/chat', json={'messages': [], 'answers': answers}).json()
 
     guard = 0
     while turn['type'] == 'question' and guard < 20:
         q = turn['question']
         opt = q['options'][0]
-        turn = client.post('/ai/chat', json={
-            'messages': [],
-            'answers': [{'key': q['id'], 'answer': opt['id']}],
-        }).json()
+        answers.append({'key': q['id'], 'answer': opt['id']})
+        turn = client.post('/ai/chat', json={'messages': [], 'answers': answers}).json()
         guard += 1
 
-    assert turn['type'] == 'result'
+    assert turn['type'] == 'result', f'Expected result, got {turn["type"]} after {guard} turns'
     triage = turn['triage']
     assert len(triage['recommended_specialties']) >= 1
     assert triage['recommended_specialties'][0]['code'] == 'D003'
@@ -50,25 +43,17 @@ def test_knee_flow_targets_orthopedic_specialty(client):
 
 
 def test_chest_pain_sweating_flags_emergency(client):
-    turn = client.post('/ai/chat', json={
-        'messages': [{'role': 'patient', 'text': 'I have chest pain and I am sweating heavily'}],
-        'answers': [],
-    }).json()
+    messages = [{'role': 'patient', 'text': 'I have chest pain and I am sweating heavily'}]
+    answers: list[dict] = []
+
+    turn = client.post('/ai/chat', json={'messages': messages, 'answers': answers}).json()
     if turn['type'] == 'question':
-        q = turn['question']
-        turn = client.post('/ai/chat', json={
-            'messages': [],
-            'answers': [
-                {'key': q['id'], 'answer': 'not_sure'},
-                {'key': 'Q_chest_assoc', 'answer': 'sweating'},
-            ],
-        }).json()
+        answers.append({'key': turn['question']['id'], 'answer': 'not_sure'})
+        answers.append({'key': 'Q_chest_assoc', 'answer': 'sweating'})
+        turn = client.post('/ai/chat', json={'messages': [], 'answers': answers}).json()
     if turn['type'] == 'question':
-        q = turn['question']
-        turn = client.post('/ai/chat', json={
-            'messages': [],
-            'answers': [{'key': q['id'], 'answer': 'severe'}],
-        }).json()
+        answers.append({'key': turn['question']['id'], 'answer': 'severe'})
+        turn = client.post('/ai/chat', json={'messages': [], 'answers': answers}).json()
 
     assert turn['type'] == 'result'
     triage = turn['triage']

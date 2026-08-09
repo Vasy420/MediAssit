@@ -20,7 +20,8 @@ def available_slots_message(
     lines = [head]
     lines.extend(slots[:max_preview])
     if len(slots) > max_preview:
-        lines.append(lang.t('appointment.more_slots', count=str(len(slots) - max_preview)))
+        hidden = slots[max_preview:]
+        lines.append(lang.t('appointment.more_slots', count=str(len(hidden)), slots=', '.join(hidden)))
     return '\n'.join(lines)
 
 
