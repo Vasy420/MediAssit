@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { requireAuth, requireRoles } from '../middleware/auth.js';
 import {
+  handleActiveQueue,
   handleDoctorQueue,
   handleJoinQueue,
   handleOverridePriority,
@@ -14,6 +15,7 @@ export const queueRouter = Router();
 
 queueRouter.use(requireAuth);
 
+queueRouter.get('/active', handleActiveQueue);
 queueRouter.post('/join', body('appointment_id').notEmpty().withMessage('appointment_id is required'), validate, handleJoinQueue);
 queueRouter.get('/doctor/:doctorId', handleDoctorQueue);
 queueRouter.get('/patient/:patientId', handlePatientQueue);

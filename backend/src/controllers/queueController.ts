@@ -10,6 +10,14 @@ import { Errors } from '../utils/ApiError.js';
 import { getPatientForUser } from '../services/patientService.js';
 import { notify } from '../services/notificationService.js';
 
+export async function handleActiveQueue(req: Request, res: Response) {
+  if (req.user!.role !== 'patient') throw Errors.badRequest('Only patients have active queue entries');
+  const patient = await getPatientForUser(req.user!.user_id);
+  if (!patient) throw Errors.notFound('Patient record not found');
+  const entry = await listPatientQueue(patient.patient_id);
+  res.json({ entries: entry ? [entry] : [] });
+}
+
 export async function handleJoinQueue(req: Request, res: Response) {
   const { appointment_id } = req.body as { appointment_id: string };
   if (!appointment_id) throw Errors.badRequest('appointment_id is required');
