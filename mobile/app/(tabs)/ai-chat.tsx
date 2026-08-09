@@ -1,7 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet,
-  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
@@ -25,12 +24,14 @@ export default function AIChatScreen() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [answers, setAnswers] = useState<{ key: string; answer: string; rephrased: boolean }[]>([]);
-  const flatListRef = useRef<FlatList<Message>>(null);
+  const flatListRef = useRef<FlatList<Message> | null>(null);
 
-  const addMessage = (msg: Message) => {
+  const addMessage = useCallback((msg: Message) => {
     setMessages((prev) => [...prev, msg]);
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-  };
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, []);
 
   const handleTurn = (turn: ChatTurn) => {
     if (turn.type === 'question') {
@@ -162,22 +163,15 @@ export default function AIChatScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
-    >
+    <View style={styles.container}>
       <FlatList
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
-        ListFooterComponent={
-          loading ? <Text style={styles.typing}>Typing...</Text> : null
-        }
+        ListFooterComponent={loading ? TypingIndicator : null}
       />
-
       <View style={styles.inputBar}>
         <TextInput
           style={styles.input}
@@ -196,8 +190,12 @@ export default function AIChatScreen() {
           <Text style={styles.sendBtnText}>Send</Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
+}
+
+function TypingIndicator() {
+  return <Text style={styles.typing}>Typing...</Text>;
 }
 
 const styles = StyleSheet.create({
