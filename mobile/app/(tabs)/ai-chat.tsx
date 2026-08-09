@@ -4,20 +4,25 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
-import type { ChatTurn, TriageQuestion, TriageResult } from '../../src/types';
+import type { ChatTurn, TriageResult } from '../../src/types';
 
 interface Message {
   id: string;
-  type: 'question' | 'answer' | 'result' | 'user';
+  type: 'question' | 'answer' | 'result' | 'user' | 'error';
   content: string;
   options?: { id: string; key: string; text: string; emoji: string }[];
   triage?: TriageResult['triage'];
 }
 
+let nextId = 1;
+function uid(prefix: string): string {
+  return `${prefix}-${nextId++}`;
+}
+
 export default function AIChatScreen() {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([{
-    id: 'welcome',
+    id: uid('msg'),
     type: 'question',
     content: 'Hi! Describe what you\'re experiencing, and I\'ll help guide you to the right care.',
   }]);
@@ -33,10 +38,10 @@ export default function AIChatScreen() {
     }, 100);
   }, []);
 
-  const handleTurn = (turn: ChatTurn) => {
+  const handleTurn = useCallback((turn: ChatTurn) => {
     if (turn.type === 'question') {
       addMessage({
-        id: turn.question.id,
+        id: uid('q'),
         type: 'question',
         content: turn.question.text,
         options: turn.question.options,
@@ -44,7 +49,7 @@ export default function AIChatScreen() {
     } else {
       const triage = turn.triage;
       addMessage({
-        id: 'result-' + Date.now(),
+        id: uid('result'),
         type: 'result',
         content: `**${triage.urgency.label}** — ${triage.reason}\n\n` +
           `Recommended: ${triage.recommended_specialties.map((s) => s.specialty).join(', ')}\n\n` +
@@ -54,20 +59,20 @@ export default function AIChatScreen() {
       });
       if (triage.emergency_flag) {
         addMessage({
-          id: 'emergency-' + Date.now(),
+          id: uid('emergency'),
           type: 'question',
           content: 'Please seek emergency medical attention immediately. Do you want to find nearby doctors?',
           options: [{ id: 'yes', key: 'emergency.yes', text: 'Find Doctors', emoji: 'ambulance' }],
         });
       }
     }
-  };
+  }, [addMessage]);
 
-  const handleSend = async (text?: string) => {
+  const handleSend = useCallback(async (text?: string) => {
     const msg = (text || input).trim();
     if (!msg || loading) return;
     setInput('');
-    addMessage({ id: Date.now().toString(), type: 'user', content: msg });
+    addMessage({ id: uid('user'), type: 'user', content: msg });
 
     setLoading(true);
     try {
@@ -79,17 +84,17 @@ export default function AIChatScreen() {
       if (turn) {
         handleTurn(turn);
       }
-    } catch (e) {
-      addMessage({ id: 'error', type: 'question', content: 'Sorry, the AI service is unavailable. Please try again later.' });
+    } catch {
+      addMessage({ id: uid('error'), type: 'error', content: 'Sorry, the AI service is unavailable. Please try again later.' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [input, loading, answers, addMessage, handleTurn]);
 
-  const handleOptionSelect = async (option: { id: string; key: string; text: string }) => {
+  const handleOptionSelect = useCallback(async (option: { id: string; key: string; text: string }) => {
     const isCategory = option.key.startsWith('category.');
     const categoryAnswer = isCategory ? option.id : undefined;
-    addMessage({ id: option.key, type: 'answer', content: option.text });
+    addMessage({ id: uid('answer'), type: 'answer', content: option.text });
 
     const newAnswer = { key: option.key, answer: option.key.split('.').pop() || option.id, rephrased: false };
     const updatedAnswers = [...answers, newAnswer];
@@ -108,14 +113,14 @@ export default function AIChatScreen() {
       if (turn) {
         handleTurn(turn);
       }
-    } catch (e) {
-      addMessage({ id: 'error', type: 'question', content: 'Sorry, something went wrong. Please try again.' });
+    } catch {
+      addMessage({ id: uid('error'), type: 'error', content: 'Sorry, something went wrong. Please try again.' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [answers, loading, addMessage, handleTurn]);
 
-  const renderMessage = ({ item }: { item: Message }) => {
+  const renderMessage = useCallback(({ item }: { item: Message }) => {
     if (item.type === 'user') {
       return (
         <View style={styles.userBubble}>
@@ -128,6 +133,14 @@ export default function AIChatScreen() {
       return (
         <View style={styles.answerBubble}>
           <Text style={styles.answerText}>{item.content}</Text>
+        </View>
+      );
+    }
+
+    if (item.type === 'error') {
+      return (
+        <View style={styles.errorBubble}>
+          <Text style={styles.errorText}>{item.content}</Text>
         </View>
       );
     }
@@ -160,7 +173,9 @@ export default function AIChatScreen() {
         )}
       </View>
     );
-  };
+  }, [loading, handleOptionSelect, router]);
+
+  const keyExtractor = useCallback((item: Message) => item.id, []);
 
   return (
     <View style={styles.container}>
@@ -168,7 +183,7 @@ export default function AIChatScreen() {
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         contentContainerStyle={styles.listContent}
         ListFooterComponent={loading ? TypingIndicator : null}
       />
@@ -209,6 +224,8 @@ const styles = StyleSheet.create({
   answerText: { fontSize: 14, color: '#1E40AF' },
   resultBubble: { alignSelf: 'flex-start', backgroundColor: '#FEF3C7', borderRadius: 12, padding: 14, marginBottom: 10, maxWidth: '90%', borderWidth: 1, borderColor: '#FCD34D' },
   resultText: { fontSize: 15, color: '#92400E', lineHeight: 22 },
+  errorBubble: { alignSelf: 'flex-start', backgroundColor: '#FEE2E2', borderRadius: 12, padding: 14, marginBottom: 10, maxWidth: '85%', borderWidth: 1, borderColor: '#FECACA' },
+  errorText: { fontSize: 15, color: '#991B1B', lineHeight: 22 },
   optionsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   optionChip: { backgroundColor: '#EEF2FF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#C7D2FE' },
   optionText: { fontSize: 13, color: '#3730A3' },
