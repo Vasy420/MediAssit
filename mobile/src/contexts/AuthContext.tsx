@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter, useSegments } from 'expo-router';
-import { api } from '../api/client';
+import { api, setOnUnauthorized } from '../api/client';
 import type { User } from '../types';
 
 interface AuthState {
@@ -75,6 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     router.replace('/(auth)/login');
   };
+
+  useEffect(() => {
+    setOnUnauthorized(logout);
+    return () => setOnUnauthorized(null);
+  }, []);
 
   return (
     <AuthContext.Provider

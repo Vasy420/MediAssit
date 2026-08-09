@@ -50,10 +50,22 @@ async function request<T>(
   const data = await res.json();
 
   if (!res.ok) {
+    if (res.status === 401) {
+      await removeToken();
+      await removeStoredUser();
+      _onUnauthorized?.();
+      throw new Error('Session expired. Please login again.');
+    }
     throw new Error(data.message || data.error || `Request failed with status ${res.status}`);
   }
 
   return data as ApiResponse<T>;
+}
+
+let _onUnauthorized: (() => void) | null = null;
+
+export function setOnUnauthorized(fn: (() => void) | null): void {
+  _onUnauthorized = fn;
 }
 
 export const api = {
