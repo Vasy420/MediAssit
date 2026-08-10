@@ -25,6 +25,9 @@ venv/
 .DS_Store
 Thumbs.db
 
+# IDE
+.idea/
+
 # Logs
 *.log
 mongodb-data/
