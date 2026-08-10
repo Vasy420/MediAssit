@@ -23,6 +23,7 @@ export interface RegisterInput {
 export interface LoginInput {
   identifier: string;
   password: string;
+  role?: 'patient' | 'doctor';
 }
 
 function signToken(user: { user_id: string; role: string; name: string }): string {
@@ -39,20 +40,28 @@ async function publicUser(userId: string) {
 
 export async function register(input: RegisterInput) {
   const role = input.role === 'doctor' ? 'doctor' : 'patient';
+  const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
+  const phone = input.phone?.trim() ?? '';
 
-  const existing = await User.findOne({
-    $or: [{ email }, ...(input.phone ? [{ phone: input.phone.trim() }] : [])],
-  }).lean();
-  if (existing) throw Errors.conflict('An account with this email or phone already exists');
+  const existingEmail = await User.findOne({ email }).lean();
+  if (existingEmail) throw Errors.conflict('Email already exists');
+
+  const existingUsername = await User.findOne({ name: new RegExp(`^${escapeRegExp(name)}$`, 'i') }).lean();
+  if (existingUsername) throw Errors.conflict('Account already exists with same username');
+
+  if (phone) {
+    const existingPhone = await User.findOne({ phone }).lean();
+    if (existingPhone) throw Errors.conflict('Phone number already exists');
+  }
 
   const user_id = await nextId('U');
   const password_hash = await bcrypt.hash(input.password, env.bcryptRounds);
   const user = await User.create({
     user_id,
-    name: input.name.trim(),
+    name,
     email,
-    phone: input.phone?.trim() ?? '',
+    phone,
     password_hash,
     role,
   });
@@ -62,7 +71,7 @@ export async function register(input: RegisterInput) {
     patient = await Patient.create({
       patient_id: await nextId('P'),
       user_id,
-      name: input.name.trim(),
+       name,
       age: input.age,
       gender: (input.gender ?? '') as '' | 'male' | 'female' | 'other',
     });
@@ -72,12 +81,19 @@ export async function register(input: RegisterInput) {
   return { user: await publicUser(user_id), patient, token: signToken(user) };
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export async function login(input: LoginInput) {
   const identifier = input.identifier.trim();
   const user = await User.findOne({
     $or: [{ email: identifier.toLowerCase() }, { phone: identifier }],
   }).lean();
   if (!user) throw Errors.unauthorized('Invalid email/phone or password');
+  if (input.role && user.role !== input.role) {
+    throw Errors.unauthorized(`This account is registered as a ${user.role}`);
+  }
 
   const ok = await bcrypt.compare(input.password, user.password_hash);
   if (!ok) throw Errors.unauthorized('Invalid email/phone or password');

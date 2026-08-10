@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
+import { Button } from '../../src/ui/Button';
+import { Card } from '../../src/ui/Card';
+import { Screen } from '../../src/ui/Screen';
+import { StatusBadge } from '../../src/ui/StatusBadge';
+import { TextField } from '../../src/ui/TextField';
+import { colors, layout, spacing, typography } from '../../src/ui/theme';
 
 interface PatientSummary {
   patient: {
@@ -42,29 +48,27 @@ export default function PatientsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <Screen padded={false}>
+    <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.title}>Patient Lookup</Text>
       <View style={styles.searchRow}>
-        <TextInput
-          style={styles.searchInput}
+        <TextField
           value={patientId}
           onChangeText={setPatientId}
           placeholder="Enter patient ID (e.g., P001)"
-          placeholderTextColor="#94A3B8"
+          containerStyle={styles.searchInput}
         />
-        <TouchableOpacity style={styles.searchBtn} onPress={searchPatient} disabled={loading}>
-          <Text style={styles.searchBtnText}>{loading ? '...' : 'Search'}</Text>
-        </TouchableOpacity>
+        <Button title="Search" style={styles.searchBtn} onPress={searchPatient} disabled={loading} loading={loading} />
       </View>
 
-      {loading && <ActivityIndicator size="small" color="#2563EB" style={{ marginTop: 20 }} />}
+      {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: spacing.xl }} />}
 
       {searched && !loading && !patient && (
         <Text style={styles.emptyText}>Patient not found.</Text>
       )}
 
       {patient && (
-        <View style={styles.resultCard}>
+        <Card style={styles.resultCard}>
           <Text style={styles.sectionTitle}>Patient Profile</Text>
           <Text style={styles.field}>Name: {patient.patient.name}</Text>
           <Text style={styles.field}>Age: {patient.patient.age ?? 'N/A'}</Text>
@@ -97,42 +101,42 @@ export default function PatientsScreen() {
           )}
 
           {patient.urgency && (
-            <Text style={styles.field}>Urgency: {patient.urgency.toUpperCase()}</Text>
+            <StatusBadge label={patient.urgency} tone={patient.urgency === 'red' ? 'danger' : patient.urgency === 'orange' || patient.urgency === 'yellow' ? 'warning' : 'success'} />
           )}
 
           {patient.recent_reports && patient.recent_reports.length > 0 && (
             <>
               <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Recent Reports</Text>
               {patient.recent_reports.map((r) => (
-                <TouchableOpacity
+                <Pressable
                   key={r.report_id}
-                  style={styles.reportItem}
+                  style={({ pressed }) => [styles.reportItem, pressed && styles.pressed]}
                   onPress={() => router.push(`/reports/${r.report_id}`)}
                 >
                   <Text style={styles.field}>{r.diagnosis}</Text>
                   <Text style={styles.reportDate}>{new Date(r.date).toLocaleDateString()}</Text>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </>
           )}
-        </View>
+        </Card>
       )}
     </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 20, paddingBottom: 40 },
-  title: { fontSize: 22, fontWeight: '700', color: '#1E293B', marginBottom: 16 },
-  searchRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  searchInput: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, backgroundColor: '#FFF', color: '#1E293B' },
-  searchBtn: { backgroundColor: '#2563EB', borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12, justifyContent: 'center' },
-  searchBtnText: { color: '#FFF', fontWeight: '600', fontSize: 15 },
-  emptyText: { fontSize: 14, color: '#94A3B8', textAlign: 'center', marginTop: 20 },
-  resultCard: { backgroundColor: '#FFF', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginBottom: 8 },
-  field: { fontSize: 14, color: '#475569', marginBottom: 4 },
-  reportItem: { borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 8, marginTop: 4 },
-  reportDate: { fontSize: 12, color: '#94A3B8' },
+  content: { padding: layout.horizontalPadding, paddingBottom: 40 },
+  title: { ...typography.title, color: colors.ink, marginBottom: spacing.lg },
+  searchRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg, alignItems: 'flex-end' },
+  searchInput: { flex: 1 },
+  searchBtn: { minWidth: 92 },
+  emptyText: { ...typography.body, color: colors.inkSubtle, textAlign: 'center', marginTop: spacing.xl },
+  resultCard: { padding: spacing.lg },
+  sectionTitle: { ...typography.heading, color: colors.ink, marginBottom: spacing.sm },
+  field: { ...typography.body, color: colors.inkMuted, marginBottom: spacing.xs },
+  reportItem: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, marginTop: spacing.sm },
+  reportDate: { ...typography.caption, color: colors.inkSubtle },
+  pressed: { opacity: 0.78 },
 });

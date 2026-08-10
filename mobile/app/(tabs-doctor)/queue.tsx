@@ -1,7 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { api } from '../../src/api/client';
+import { Button } from '../../src/ui/Button';
+import { Card } from '../../src/ui/Card';
+import { Screen } from '../../src/ui/Screen';
+import { StatusBadge } from '../../src/ui/StatusBadge';
+import { colors, layout, spacing, typography } from '../../src/ui/theme';
 
 interface QueueEntry {
   queue_id: string;
@@ -34,8 +39,8 @@ export default function DoctorQueueScreen() {
   useEffect(() => {
     async function getDoctor() {
       try {
-        const me = await api.get<{ patient_id?: string; doctor_id?: string }>('/api/auth/me');
-        const docId = (me.data as { doctor_id?: string })?.doctor_id;
+        const me = await api.get<{ doctor?: { doctor_id?: string } }>('/api/doctors/me');
+        const docId = (me.data as { doctor?: { doctor_id?: string } })?.doctor?.doctor_id;
         if (docId) setDoctorId(docId);
       } catch {
         // ignore
@@ -86,19 +91,18 @@ export default function DoctorQueueScreen() {
     }
   };
 
-  if (loading) return <ActivityIndicator size="large" color="#2563EB" style={{ marginTop: 60 }} />;
+  if (loading) return <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />;
 
   const waiting = entries.filter((e) => e.status === 'waiting');
   const active = entries.filter((e) => e.status === 'called' || e.status === 'in_consultation');
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <Screen padded={false}>
+    <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Queue ({entries.length})</Text>
         {waiting.length > 0 && (
-          <TouchableOpacity style={styles.callNextBtn} onPress={handleCallNext}>
-            <Text style={styles.callNextBtnText}>Call Next</Text>
-          </TouchableOpacity>
+          <Button title="Call Next" variant="success" style={styles.callNextBtn} onPress={handleCallNext} />
         )}
       </View>
 
@@ -106,29 +110,21 @@ export default function DoctorQueueScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Active</Text>
           {active.map((entry) => (
-            <View key={entry.queue_id} style={styles.card}>
+            <Card key={entry.queue_id} style={styles.card}>
               <View style={styles.cardHeader}>
                 <Text style={styles.patientName}>{entry.patient?.name ?? entry.patient_id}</Text>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>
-                    {entry.status === 'called' ? 'CALLED' : 'IN CONSULTATION'}
-                  </Text>
-                </View>
+                <StatusBadge label={entry.status === 'called' ? 'Called' : 'In Consultation'} tone="warning" />
               </View>
               <Text style={styles.detail}>Position: #{entry.position}</Text>
               <Text style={styles.detail}>Urgency: {entry.urgency.toUpperCase()}</Text>
               {entry.appointment_time && <Text style={styles.detail}>Appointment: {entry.appointment_time}</Text>}
               <View style={styles.actionRow}>
                 {entry.status === 'called' && (
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleStartConsultation(entry.queue_id)}>
-                    <Text style={styles.actionBtnText}>Start Consultation</Text>
-                  </TouchableOpacity>
+                  <Button title="Start Consultation" style={styles.actionBtn} onPress={() => handleStartConsultation(entry.queue_id)} />
                 )}
-                <TouchableOpacity style={styles.completeBtn} onPress={() => handleComplete(entry.queue_id)}>
-                  <Text style={styles.completeBtnText}>Complete</Text>
-                </TouchableOpacity>
+                <Button title="Complete" variant="success" style={styles.completeBtn} onPress={() => handleComplete(entry.queue_id)} />
               </View>
-            </View>
+            </Card>
           ))}
         </View>
       )}
@@ -139,46 +135,36 @@ export default function DoctorQueueScreen() {
           <Text style={styles.emptyText}>No patients waiting.</Text>
         ) : (
           waiting.map((entry, i) => (
-            <View key={entry.queue_id} style={styles.card}>
+            <Card key={entry.queue_id} style={styles.card}>
               <View style={styles.cardHeader}>
                 <Text style={styles.patientName}>{entry.patient?.name ?? entry.patient_id}</Text>
-                <Text style={[styles.urgencyBadge, {
-                  color: entry.urgency === 'red' ? '#DC2626' : entry.urgency === 'orange' ? '#F97316' : entry.urgency === 'yellow' ? '#EAB308' : '#22C55E',
-                }]}>
-                  {entry.urgency.toUpperCase()}
-                </Text>
+                <StatusBadge label={entry.urgency} tone={entry.urgency === 'red' ? 'danger' : entry.urgency === 'orange' || entry.urgency === 'yellow' ? 'warning' : 'success'} />
               </View>
               <Text style={styles.detail}>Position: #{entry.position}</Text>
               <Text style={styles.detail}>Est. wait: ~{entry.waiting_time} min</Text>
               {entry.appointment_time && <Text style={styles.detail}>Appointment: {entry.appointment_time}</Text>}
-            </View>
+            </Card>
           ))
         )}
       </View>
     </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 20, paddingBottom: 40 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  title: { fontSize: 22, fontWeight: '700', color: '#1E293B' },
-  callNextBtn: { backgroundColor: '#22C55E', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 12 },
-  callNextBtnText: { color: '#FFF', fontWeight: '600', fontSize: 15 },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#475569', marginBottom: 10 },
-  card: { backgroundColor: '#FFF', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 8 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  patientName: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
-  statusBadge: { backgroundColor: '#FEF3C7', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
-  statusText: { fontSize: 12, fontWeight: '700', color: '#D97706' },
-  urgencyBadge: { fontSize: 12, fontWeight: '700' },
-  detail: { fontSize: 14, color: '#64748B', marginBottom: 2 },
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  actionBtn: { flex: 1, backgroundColor: '#2563EB', borderRadius: 8, padding: 10, alignItems: 'center' },
-  actionBtnText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
-  completeBtn: { flex: 1, backgroundColor: '#22C55E', borderRadius: 8, padding: 10, alignItems: 'center' },
-  completeBtnText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
-  emptyText: { fontSize: 14, color: '#94A3B8', textAlign: 'center', marginTop: 10 },
+  content: { padding: layout.horizontalPadding, paddingBottom: 40 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xl },
+  title: { ...typography.title, color: colors.ink },
+  callNextBtn: { minWidth: 112 },
+  section: { marginBottom: spacing.xxl },
+  sectionTitle: { ...typography.heading, color: colors.inkMuted, marginBottom: spacing.md },
+  card: { marginBottom: spacing.sm },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  patientName: { ...typography.heading, color: colors.ink },
+  detail: { ...typography.body, color: colors.inkMuted, marginBottom: 2 },
+  actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  actionBtn: { flex: 1 },
+  completeBtn: { flex: 1 },
+  emptyText: { ...typography.body, color: colors.inkSubtle, textAlign: 'center', marginTop: spacing.sm },
 });

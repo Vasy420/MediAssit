@@ -26,11 +26,14 @@ export interface Appointment {
   appointment_id: string;
   patient_id: string;
   doctor_id: string;
+  doctor_name?: string;
   date: string;
   time: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  hospital?: string;
+  status: 'pending' | 'scheduled' | 'confirmed' | 'in_queue' | 'in_consultation' | 'cancelled' | 'completed' | 'no_show';
   reason?: string;
   urgency?: 'green' | 'yellow' | 'orange' | 'red';
+  is_fake?: boolean;
 }
 
 export interface QueueEntry {

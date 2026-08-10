@@ -1,17 +1,23 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, ScrollView, Pressable } from 'react-native';
 import { Link } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useSettings } from '../../src/contexts/SettingsContext';
 import { api } from '../../src/api/client';
 import type { User } from '../../src/types';
+import { Button } from '../../src/ui/Button';
+import { Screen } from '../../src/ui/Screen';
+import { TextField } from '../../src/ui/TextField';
+import { PasswordField } from '../../src/ui/PasswordField';
+import { colors, radii, spacing, typography } from '../../src/ui/theme';
 
 export default function RegisterScreen() {
   const { registerUser } = useAuth();
+  const { theme } = useSettings();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [age, setAge] = useState('');
-  const [gender, setGender] = useState('');
+  const [role, setRole] = useState<'patient' | 'doctor'>('patient');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
@@ -25,9 +31,7 @@ export default function RegisterScreen() {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password,
-        role: 'patient',
-        age: age ? parseInt(age) : undefined,
-        gender: gender || undefined,
+        role,
       });
       const resAny = res as unknown as Record<string, unknown>;
       const finalToken = ((resAny.data as Record<string, unknown>)?.token ?? resAny.token) as string;
@@ -36,48 +40,73 @@ export default function RegisterScreen() {
         await registerUser(finalToken, finalUser);
       }
     } catch (e) {
-      Alert.alert('Registration Failed', (e as Error).message);
+      const message = (e as Error).message;
+      const normalized = message.toLowerCase();
+      if (normalized.includes('email already exists')) {
+        Alert.alert('Email already exists', 'Use a different email address or log in.');
+      } else if (normalized.includes('same username')) {
+        Alert.alert('Username already exists', 'Choose a different username.');
+      } else if (normalized.includes('phone number already exists')) {
+        Alert.alert('Phone number already exists', 'Use a different phone number.');
+      } else {
+        Alert.alert('Registration Failed', message);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
+    <Screen padded={false} style={{ backgroundColor: theme.background }}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Join MedAssist+ today</Text>
+        <View style={[styles.logo, { backgroundColor: theme.primary }]}><Text style={[styles.logoText, { color: theme.onPrimary }]}>M+</Text></View>
+        <Text style={[styles.title, { color: theme.ink }]}>Create Account</Text>
+        <Text style={[styles.subtitle, { color: theme.inkMuted }]}>Join MedAssist+ today</Text>
       </View>
 
-      <TextInput style={styles.input} placeholder="Full Name" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-      <TextInput style={styles.input} placeholder="Password (min 6 chars)" value={password} onChangeText={setPassword} secureTextEntry />
-      <TextInput style={styles.input} placeholder="Age (optional)" value={age} onChangeText={setAge} keyboardType="numeric" />
-      <TextInput style={styles.input} placeholder="Gender (optional)" value={gender} onChangeText={setGender} />
+      <TextField label="Username" placeholder="Username" value={name} onChangeText={setName} containerStyle={styles.field} />
+      <TextField label="Email" placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" containerStyle={styles.field} />
+      <PasswordField label="Password" placeholder="Password (min 6 chars)" value={password} onChangeText={setPassword} containerStyle={styles.field} />
+      <Text style={[styles.accountLabel, { color: theme.inkMuted }]}>Create account as</Text>
+      <View style={styles.roleRow}>
+        {(['patient', 'doctor'] as const).map((option) => (
+          <Pressable key={option} onPress={() => setRole(option)} style={({ pressed }) => [styles.roleOption, { backgroundColor: role === option ? theme.primary : theme.surfaceMuted, borderColor: role === option ? theme.primary : theme.border }, pressed && styles.pressed]}>
+            <Text style={{ color: role === option ? theme.onPrimary : theme.ink, fontWeight: '700' }}>{option === 'patient' ? 'Patient' : 'Doctor'}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={[styles.hint, { color: theme.inkMuted }]}>{role === 'doctor' ? 'You will complete your professional profile after registration.' : 'You will complete your health details after registration.'}</Text>
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
+      <Button
+        title={loading ? 'Registering...' : 'Register'}
+        style={styles.button}
         onPress={handleRegister}
         disabled={loading}
-      >
-        <Text style={styles.buttonText}>{loading ? 'Registering...' : 'Register'}</Text>
-      </TouchableOpacity>
+        loading={loading}
+      />
 
-      <Link href="/(auth)/login" style={styles.link}>
+      <Link href="/(auth)/login" style={[styles.link, { color: theme.primary }]}>
         Already have an account? Login
       </Link>
-    </View>
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#F8FAFC' },
-  header: { alignItems: 'center', marginBottom: 24 },
-  title: { fontSize: 24, fontWeight: '700', color: '#1E293B' },
-  subtitle: { fontSize: 14, color: '#64748B', marginTop: 4 },
-  input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 14, fontSize: 16, marginBottom: 12 },
-  button: { backgroundColor: '#2563EB', borderRadius: 8, padding: 16, alignItems: 'center', marginTop: 8 },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
-  link: { textAlign: 'center', marginTop: 20, color: '#2563EB', fontSize: 14 },
+  container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+  header: { alignItems: 'center', marginBottom: 28 },
+  logo: { width: 56, height: 56, borderRadius: radii.lg, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+  logoText: { fontSize: 20, fontWeight: '800' },
+  title: { ...typography.title },
+  subtitle: { ...typography.body, marginTop: spacing.xs },
+  field: { marginBottom: spacing.md },
+  button: { marginTop: spacing.sm },
+  link: { textAlign: 'center', marginTop: spacing.xl, fontSize: 14, fontWeight: '600' },
+  accountLabel: { ...typography.label, marginTop: spacing.sm, marginBottom: spacing.sm },
+  roleRow: { flexDirection: 'row', gap: spacing.sm },
+  roleOption: { flex: 1, minHeight: 46, borderRadius: radii.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  hint: { ...typography.caption, marginTop: spacing.sm },
+  pressed: { opacity: 0.64, transform: [{ scale: 0.96 }] },
 });

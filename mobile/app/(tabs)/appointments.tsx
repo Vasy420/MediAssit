@@ -1,26 +1,35 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
 import type { Appointment } from '../../src/types';
+import { useSettings } from '../../src/contexts/SettingsContext';
+import { Button } from '../../src/ui/Button';
+import { Card } from '../../src/ui/Card';
+import { Screen } from '../../src/ui/Screen';
+import { StatusBadge } from '../../src/ui/StatusBadge';
+import { colors, layout, spacing, typography } from '../../src/ui/theme';
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: '#F59E0B',
-  confirmed: '#16A34A',
-  cancelled: '#DC2626',
-  completed: '#6B7280',
-};
+const STATUS_TONES = { pending: 'warning', scheduled: 'primary', confirmed: 'success', in_queue: 'primary', in_consultation: 'warning', cancelled: 'danger', completed: 'neutral', no_show: 'danger' } as const;
 
 export default function AppointmentsScreen() {
   const router = useRouter();
+  const { testMode, fakeAppointments, removeFakeAppointment } = useSettings();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const visibleAppointments = testMode
+    ? [...fakeAppointments, ...appointments.filter((appointment) => !appointment.is_fake)]
+    : appointments.filter((appointment) => !appointment.is_fake);
 
   const loadAppointments = useCallback(async () => {
     try {
-      const res = await api.get<{ appointments: Appointment[] }>('/api/appointments?limit=20');
-      setAppointments(((res.data as { appointments: Appointment[] })?.appointments) ?? []);
+      const res = await api.get<Appointment[]>('/api/appointments?limit=20');
+      const rows = Array.isArray(res.data) ? res.data : [];
+      setAppointments(rows.map((appointment) => {
+        const withDoctor = appointment as Appointment & { doctor?: { name?: string } | null };
+        return { ...appointment, doctor_name: appointment.doctor_name ?? withDoctor.doctor?.name };
+      }));
     } catch {
       // Offline — use cached/empty
     } finally {
@@ -32,6 +41,11 @@ export default function AppointmentsScreen() {
   useEffect(() => { loadAppointments(); }, [loadAppointments]);
 
   const handleCancel = async (appt: Appointment) => {
+    if (appt.is_fake) {
+      removeFakeAppointment(appt.appointment_id);
+      Alert.alert('Fake appointment removed', 'Test appointment was removed locally.');
+      return;
+    }
     Alert.alert('Cancel Appointment', 'Are you sure?', [
       { text: 'No', style: 'cancel' },
       {
@@ -39,7 +53,7 @@ export default function AppointmentsScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await api.patch(`/api/appointments/${appt.appointment_id}/cancel`);
+            await api.patch(`/api/appointments/${appt.appointment_id}`, { status: 'cancelled' });
             setAppointments((prev) =>
               prev.map((a) => (a.appointment_id === appt.appointment_id ? { ...a, status: 'cancelled' } : a)),
             );
@@ -52,6 +66,10 @@ export default function AppointmentsScreen() {
   };
 
   const handleJoinQueue = async (appt: Appointment) => {
+    if (appt.is_fake) {
+      Alert.alert('Fake test data', 'Queue API was not called for this fake appointment. Disable Test Mode to remove it.');
+      return;
+    }
     try {
       const res = await api.post<{ queue_id: string }>('/api/queue/join', { appointment_id: appt.appointment_id });
       const queueId = ((res.data as { queue_id?: string })?.queue_id);
@@ -64,75 +82,62 @@ export default function AppointmentsScreen() {
   };
 
   if (loading) {
-    return <ActivityIndicator size="large" color="#2563EB" style={{ marginTop: 60 }} />;
+    return <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />;
   }
 
   return (
+    <Screen padded={false}>
     <FlatList
-      data={appointments}
+      data={visibleAppointments}
       keyExtractor={(item) => item.appointment_id}
       contentContainerStyle={styles.container}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadAppointments(); }} />}
       renderItem={({ item: appt }) => (
-        <View style={styles.card}>
+        <Card style={styles.card}>
           <View style={styles.cardTop}>
             <Text style={styles.date}>{new Date(appt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
             <Text style={styles.time}>{appt.time}</Text>
-            <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[appt.status] || '#6B7280' }]}>
-              <Text style={styles.statusText}>{appt.status.toUpperCase()}</Text>
-            </View>
+            <StatusBadge label={appt.status} tone={STATUS_TONES[appt.status as keyof typeof STATUS_TONES] || 'neutral'} />
           </View>
+          {appt.is_fake && <StatusBadge label="Fake test data" tone="warning" />}
+          {appt.doctor_name && <Text style={styles.doctorName}>{appt.doctor_name}</Text>}
           {appt.reason && <Text style={styles.reason}>Reason: {appt.reason}</Text>}
           {appt.urgency && (
             <Text style={[styles.urgency, { color: appt.urgency === 'red' ? '#DC2626' : '#F59E0B' }]}>
               Urgency: {appt.urgency.toUpperCase()}
             </Text>
           )}
-          {appt.status === 'confirmed' && (
+          {(appt.status === 'scheduled' || appt.status === 'confirmed') && (
             <View style={styles.actions}>
-              <TouchableOpacity style={styles.preconsultBtn} onPress={() => router.push(`/preconsult/${appt.appointment_id}`)}>
-                <Text style={styles.preconsultBtnText}>Pre-Consult</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.joinBtn} onPress={() => handleJoinQueue(appt)}>
-                <Text style={styles.joinBtnText}>Join Queue</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => handleCancel(appt)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
+              <Button title="Pre-Consult" variant="secondary" style={styles.actionButton} onPress={() => appt.is_fake ? Alert.alert('Fake test data', 'Pre-consultation API was not called for this fake appointment.') : router.push(`/preconsult/${appt.appointment_id}`)} />
+              <Button title="Join Queue" variant="success" style={styles.actionButton} onPress={() => handleJoinQueue(appt)} />
+              <Button title="Cancel" variant="danger" style={styles.actionButton} onPress={() => handleCancel(appt)} />
             </View>
           )}
-        </View>
+        </Card>
       )}
       ListEmptyComponent={
         <View style={styles.emptyView}>
           <Text style={styles.emptyText}>No appointments yet.</Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/doctors')}>
-            <Text style={styles.emptyLink}>Find a Doctor</Text>
-          </TouchableOpacity>
+          <Button title="Find a Doctor" variant="secondary" onPress={() => router.push('/(tabs)/doctors')} />
         </View>
       }
     />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 40 },
-  card: { backgroundColor: '#FFF', borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  date: { fontSize: 15, fontWeight: '600', color: '#1E293B', flex: 1 },
-  time: { fontSize: 15, color: '#2563EB', fontWeight: '600', marginRight: 10 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  statusText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
-  reason: { fontSize: 14, color: '#475569', marginBottom: 4 },
-  urgency: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 6, flexWrap: 'wrap' },
-  preconsultBtn: { backgroundColor: '#3B82F6', borderRadius: 8, padding: 10, alignItems: 'center', minWidth: 90 },
-  preconsultBtnText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
-  joinBtn: { flex: 1, backgroundColor: '#16A34A', borderRadius: 8, padding: 10, alignItems: 'center' },
-  joinBtnText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
-  cancelBtn: { flex: 1, backgroundColor: '#FEE2E2', borderRadius: 8, padding: 10, alignItems: 'center' },
-  cancelBtnText: { color: '#DC2626', fontWeight: '600', fontSize: 14 },
+  container: { padding: layout.horizontalPadding, paddingBottom: 40 },
+  card: { marginBottom: spacing.md },
+  cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+  date: { ...typography.heading, color: colors.ink, flex: 1 },
+  time: { ...typography.label, color: colors.primary, marginRight: spacing.sm },
+  doctorName: { ...typography.body, color: colors.primary, marginTop: spacing.sm },
+  reason: { ...typography.body, color: colors.inkMuted, marginBottom: spacing.xs },
+  urgency: { ...typography.caption, marginBottom: spacing.sm },
+  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
+  actionButton: { flexGrow: 1, flexBasis: '30%', paddingHorizontal: spacing.sm },
   emptyView: { alignItems: 'center', marginTop: 60 },
-  emptyText: { fontSize: 16, color: '#94A3B8', marginBottom: 12 },
-  emptyLink: { fontSize: 16, color: '#2563EB', fontWeight: '600' },
+  emptyText: { ...typography.body, color: colors.inkSubtle, marginBottom: spacing.md },
 });

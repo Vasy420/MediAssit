@@ -52,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const inAuthGroup = segments[0] === '(auth)';
     if (!token && !inAuthGroup) {
       router.replace('/(auth)/login');
+    } else if (token && user && inAuthGroup) {
+      router.replace(user.role === 'doctor' ? '/doctor-onboarding' : '/patient-onboarding');
     }
   }, [token, loading, segments, router, user]);
 
@@ -59,21 +61,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await Promise.all([api.setToken(t), api.setStoredUser(JSON.stringify(u))]);
     setToken(t);
     setUser(u);
-    router.replace(u.role === 'doctor' ? '/(tabs-doctor)' : '/(tabs)');
+    router.replace(u.role === 'doctor' ? '/doctor-onboarding' : '/patient-onboarding');
   };
 
   const registerUser = async (t: string, u: User) => {
     await Promise.all([api.setToken(t), api.setStoredUser(JSON.stringify(u))]);
     setToken(t);
     setUser(u);
-    router.replace(u.role === 'doctor' ? '/(tabs-doctor)' : '/(tabs)');
+    router.replace(u.role === 'doctor' ? '/doctor-onboarding' : '/patient-onboarding');
   };
 
   const logout = async () => {
-    await Promise.all([api.removeToken(), api.removeStoredUser()]);
     setToken(null);
     setUser(null);
     router.replace('/(auth)/login');
+    try {
+      await Promise.all([api.removeToken(), api.removeStoredUser()]);
+    } catch {
+      // Navigation and in-memory auth state must not depend on storage cleanup.
+    }
   };
 
   useEffect(() => {

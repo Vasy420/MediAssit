@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
+import { Card } from '../../src/ui/Card';
+import { Screen } from '../../src/ui/Screen';
+import { colors, layout, spacing, typography } from '../../src/ui/theme';
 
 interface MedicalReport {
   report_id: string;
@@ -30,18 +33,19 @@ export default function DoctorReportsScreen() {
     loadReports();
   }, []);
 
-  if (loading) return <ActivityIndicator size="large" color="#2563EB" style={{ marginTop: 60 }} />;
+  if (loading) return <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <Screen padded={false}>
+    <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.title}>My Reports</Text>
       {reports.length === 0 ? (
         <Text style={styles.emptyText}>No reports yet.</Text>
       ) : (
         reports.map((report) => (
-          <TouchableOpacity
+          <Pressable
             key={report.report_id}
-            style={styles.card}
+            style={({ pressed }) => [styles.card, pressed && styles.pressed]}
             onPress={() => router.push(`/reports/${report.report_id}`)}
           >
             <Text style={styles.reportId}>Report #{report.report_id}</Text>
@@ -50,21 +54,22 @@ export default function DoctorReportsScreen() {
             {report.symptoms && report.symptoms.length > 0 && (
               <Text style={styles.symptoms}>Symptoms: {report.symptoms.join(', ')}</Text>
             )}
-          </TouchableOpacity>
+          </Pressable>
         ))
       )}
     </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 20, paddingBottom: 40 },
-  title: { fontSize: 22, fontWeight: '700', color: '#1E293B', marginBottom: 16 },
-  emptyText: { fontSize: 14, color: '#94A3B8', textAlign: 'center', marginTop: 40 },
-  card: { backgroundColor: '#FFF', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 10 },
-  reportId: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
-  diagnosis: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginTop: 4 },
-  date: { fontSize: 13, color: '#64748B', marginTop: 4 },
-  symptoms: { fontSize: 13, color: '#475569', marginTop: 4 },
+  content: { padding: layout.horizontalPadding, paddingBottom: 40 },
+  title: { ...typography.title, color: colors.ink, marginBottom: spacing.lg },
+  emptyText: { ...typography.body, color: colors.inkSubtle, textAlign: 'center', marginTop: 40 },
+  card: { marginBottom: spacing.md },
+  reportId: { ...typography.caption, color: colors.inkSubtle, fontWeight: '600' },
+  diagnosis: { ...typography.heading, color: colors.ink, marginTop: spacing.xs },
+  date: { ...typography.caption, color: colors.inkMuted, marginTop: spacing.xs },
+  symptoms: { ...typography.caption, color: colors.inkMuted, marginTop: spacing.xs },
+  pressed: { opacity: 0.78, transform: [{ scale: 0.99 }] },
 });

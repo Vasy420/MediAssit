@@ -1,7 +1,10 @@
-import { useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
+import { Button } from '../../src/ui/Button';
+import { Screen } from '../../src/ui/Screen';
+import { colors, layout, radii, spacing, typography } from '../../src/ui/theme';
 
 interface QuestionOption {
   id: string;
@@ -80,9 +83,9 @@ export default function PreConsultScreen() {
     }
   }, [appointmentId, processTurn, addMessage]);
 
-  useState(() => {
-    startInterview();
-  });
+  useEffect(() => {
+    void startInterview();
+  }, [startInterview]);
 
   const handleOptionSelect = useCallback(async (option: QuestionOption) => {
     if (option.key === 'free_text') return;
@@ -136,7 +139,7 @@ export default function PreConsultScreen() {
   }, [freeText, pcId, waitingKey, answers, addMessage, processTurn]);
 
   return (
-    <View style={styles.container}>
+    <Screen padded={false}>
       <ScrollView ref={scrollRef} style={styles.chatArea} contentContainerStyle={styles.chatContent}>
         {messages.map((msg, i) => (
           <View key={i} style={msg.role === 'bot' ? styles.botBubble : styles.userBubble}>
@@ -144,21 +147,21 @@ export default function PreConsultScreen() {
             {msg.options && msg.options.length > 0 && !done && (
               <View style={styles.optionsRow}>
                 {msg.options.map((opt) => (
-                  <TouchableOpacity
+                  <Pressable
                     key={opt.id}
-                    style={styles.optionChip}
+                    style={({ pressed }) => [styles.optionChip, pressed && styles.pressed]}
                     onPress={() => handleOptionSelect(opt)}
                     disabled={loading}
                   >
                     {opt.emoji ? <Text style={styles.optionEmoji}>{opt.emoji}</Text> : null}
                     <Text style={styles.optionText}>{opt.text}</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 ))}
               </View>
             )}
           </View>
         ))}
-        {loading && <ActivityIndicator size="small" color="#2563EB" style={{ marginVertical: 12 }} />}
+        {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.md }} />}
       </ScrollView>
 
       {waitingForFreeText && (
@@ -171,40 +174,35 @@ export default function PreConsultScreen() {
             placeholderTextColor="#94A3B8"
             multiline
           />
-          <TouchableOpacity style={styles.sendBtn} onPress={handleFreeTextSubmit} disabled={!freeText.trim() || loading}>
-            <Text style={styles.sendBtnText}>Send</Text>
-          </TouchableOpacity>
+          <Button title="Send" style={styles.sendBtn} onPress={handleFreeTextSubmit} disabled={!freeText.trim() || loading} loading={loading} />
         </View>
       )}
 
       {done && summary && (
         <View style={styles.doneArea}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backBtnText}>Back to Appointments</Text>
-          </TouchableOpacity>
+          <Button title="Back to Appointments" style={styles.backBtn} onPress={() => router.back()} />
         </View>
       )}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: colors.background },
   chatArea: { flex: 1 },
-  chatContent: { padding: 16, paddingBottom: 32 },
-  botBubble: { alignSelf: 'flex-start', backgroundColor: '#FFF', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0', maxWidth: '85%' },
-  userBubble: { alignSelf: 'flex-end', backgroundColor: '#2563EB', borderRadius: 12, padding: 14, marginBottom: 12, maxWidth: '85%' },
-  botText: { fontSize: 15, color: '#1E293B', lineHeight: 22 },
-  userText: { fontSize: 15, color: '#FFF', lineHeight: 22 },
-  optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  optionChip: { backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center' },
-  optionEmoji: { fontSize: 16, marginRight: 6 },
-  optionText: { fontSize: 14, color: '#334155', fontWeight: '500' },
-  inputArea: { flexDirection: 'row', alignItems: 'flex-end', padding: 12, borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: '#FFF' },
-  textInput: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: '#1E293B', maxHeight: 100 },
-  sendBtn: { marginLeft: 10, backgroundColor: '#2563EB', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 12 },
-  sendBtnText: { color: '#FFF', fontWeight: '600', fontSize: 15 },
-  doneArea: { padding: 16, borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: '#FFF' },
-  backBtn: { backgroundColor: '#2563EB', borderRadius: 12, padding: 16, alignItems: 'center' },
-  backBtnText: { color: '#FFF', fontWeight: '600', fontSize: 16 },
+  chatContent: { padding: layout.horizontalPadding, paddingBottom: spacing.xxxl },
+  botBubble: { alignSelf: 'flex-start', backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, maxWidth: '85%' },
+  userBubble: { alignSelf: 'flex-end', backgroundColor: colors.primary, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md, maxWidth: '85%' },
+  botText: { ...typography.body, color: colors.ink },
+  userText: { ...typography.body, color: colors.white },
+  optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  optionChip: { backgroundColor: colors.surfaceMuted, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', minHeight: 44 },
+  optionEmoji: { fontSize: 16, marginRight: spacing.sm },
+  optionText: { ...typography.caption, color: colors.ink },
+  inputArea: { flexDirection: 'row', alignItems: 'flex-end', padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
+  textInput: { flex: 1, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, fontSize: 15, color: colors.ink, maxHeight: 100, backgroundColor: colors.surface },
+  sendBtn: { marginLeft: spacing.sm, width: 78 },
+  doneArea: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
+  backBtn: { width: '100%' },
+  pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
 });

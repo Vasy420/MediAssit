@@ -6,6 +6,7 @@ const doctorSchema = new Schema({
   name: { type: String, required: true, trim: true },
   specialization: { type: String, required: true },
   department: { type: String, required: true },
+  hospital: { type: String, default: '' },
   qualification: { type: String, default: '' },
   experience: { type: Number, default: 0 },
   consultation_fee: { type: Number, default: 0 },

@@ -1,12 +1,50 @@
 import { Doctor } from '../models/Doctor.js';
+import { User } from '../models/User.js';
 import { Appointment } from '../models/Appointment.js';
 import { Errors } from '../utils/ApiError.js';
 import { addDaysIso, toDisplayTime, todayIso, weekdayName } from '../utils/time.js';
+import { nextId } from '../utils/idGen.js';
 
 export async function getDoctorForUser(userId: string) {
   const doctor = await Doctor.findOne({ user_id: userId }).lean();
   if (!doctor) throw Errors.notFound('Doctor record not found');
   return doctor;
+}
+
+export async function updateDoctorProfile(
+  userId: string,
+  input: {
+    specialization: string;
+    department: string;
+    hospital: string;
+    qualification?: string;
+    experience?: number;
+    consultation_fee?: number;
+    room_number?: string;
+    status?: 'available' | 'busy' | 'offline';
+  },
+) {
+  const user = await User.findOne({ user_id: userId }).lean();
+  if (!user) throw Errors.notFound('User not found');
+
+  const values = {
+    name: user.name,
+    user_id: userId,
+    specialization: input.specialization.trim(),
+    department: input.department.trim(),
+    hospital: input.hospital.trim(),
+    qualification: input.qualification?.trim() ?? '',
+    experience: input.experience ?? 0,
+    consultation_fee: input.consultation_fee ?? 0,
+    room_number: input.room_number?.trim() ?? '',
+    status: input.status ?? 'available',
+  };
+
+  return Doctor.findOneAndUpdate(
+    { user_id: userId },
+    { $set: values, $setOnInsert: { doctor_id: await nextId('D') } },
+    { new: true, upsert: true, setDefaultsOnInsert: true },
+  ).lean();
 }
 
 export async function listDoctors(specialty?: string) {

@@ -20,6 +20,7 @@ export async function handleCreateAppointment(req: Request, res: Response) {
     doctor_id: req.body.doctor_id as string,
     date: req.body.date as string,
     time: req.body.time as string,
+    hospital: req.body.hospital as string | undefined,
     reason: req.body.reason as string | undefined,
     urgency: req.body.urgency as 'green' | 'yellow' | 'orange' | 'red' | undefined,
   });
@@ -44,6 +45,13 @@ export async function handleListAppointments(req: Request, res: Response) {
     if (!own || own.patient_id !== patient_id) throw Errors.forbidden();
   }
   const appointments = await getPatientAppointments(patient_id);
+  res.json({ success: true, data: appointments });
+}
+
+export async function handleListMyAppointments(req: Request, res: Response) {
+  const own = await getPatientForUser(req.user!.user_id);
+  if (!own) throw Errors.notFound('Patient record not found');
+  const appointments = await getPatientAppointments(own.patient_id);
   res.json({ success: true, data: appointments });
 }
 

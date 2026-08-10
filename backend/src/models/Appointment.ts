@@ -6,6 +6,7 @@ const appointmentSchema = new Schema({
   doctor_id: { type: String, required: true, index: true },
   date: { type: String, required: true },
   time: { type: String, required: true },
+  hospital: { type: String, default: '' },
   reason: { type: String, default: '' },
   urgency: { type: String, enum: ['green', 'yellow', 'orange', 'red'], default: 'green' },
   status: {

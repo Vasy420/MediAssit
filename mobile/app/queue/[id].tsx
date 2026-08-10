@@ -1,8 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { api } from '../../src/api/client';
 import type { QueueEntry } from '../../src/types';
+import { Button } from '../../src/ui/Button';
+import { Card } from '../../src/ui/Card';
+import { Screen } from '../../src/ui/Screen';
+import { colors, spacing, typography } from '../../src/ui/theme';
 
 export default function QueueScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,7 +26,9 @@ export default function QueueScreen() {
   useEffect(() => {
     loadEntry().finally(() => setLoading(false));
     timerRef.current = setInterval(loadEntry, 15000);
-    return () => clearInterval(timerRef.current);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [id]);
 
   const handleCancel = async () => {
@@ -43,15 +49,15 @@ export default function QueueScreen() {
     ]);
   };
 
-  if (loading) return <ActivityIndicator size="large" color="#2563EB" style={{ marginTop: 60 }} />;
-  if (!entry) return <Text style={styles.error}>Queue entry not found.</Text>;
+  if (loading) return <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />;
+  if (!entry) return <Screen><Text style={styles.error}>Queue entry not found.</Text></Screen>;
 
   const isActive = entry.status === 'waiting';
   const isDone = entry.status === 'cancelled' || entry.status === 'completed';
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
+    <Screen style={styles.container}>
+      <Card style={styles.card}>
         <View style={styles.positionCircle}>
           <Text style={styles.positionNum}>{entry.position}</Text>
           <Text style={styles.positionLabel}>
@@ -70,12 +76,10 @@ export default function QueueScreen() {
             Estimated wait: ~{entry.estimated_wait_minutes} minutes
           </Text>
         )}
-      </View>
+      </Card>
 
       {isActive && (
-        <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
-          <Text style={styles.cancelBtnText}>Leave Queue</Text>
-        </TouchableOpacity>
+        <Button title="Leave Queue" variant="danger" style={styles.cancelBtn} onPress={handleCancel} />
       )}
 
       {isDone && (
@@ -83,20 +87,19 @@ export default function QueueScreen() {
           {entry.status === 'cancelled' ? 'You have left the queue.' : 'Your consultation is complete.'}
         </Text>
       )}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', padding: 24, backgroundColor: '#F8FAFC' },
-  card: { width: '100%', backgroundColor: '#FFF', borderRadius: 16, padding: 28, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 20 },
-  positionCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  positionNum: { fontSize: 36, fontWeight: '800', color: '#2563EB' },
-  positionLabel: { fontSize: 11, color: '#64748B', fontWeight: '600' },
-  status: { fontSize: 18, fontWeight: '600', color: '#1E293B', marginBottom: 8 },
-  waitText: { fontSize: 14, color: '#64748B' },
-  cancelBtn: { width: '100%', backgroundColor: '#FEE2E2', borderRadius: 12, padding: 16, alignItems: 'center' },
-  cancelBtnText: { color: '#DC2626', fontWeight: '600', fontSize: 16 },
-  doneText: { fontSize: 15, color: '#475569', textAlign: 'center', marginTop: 20 },
-  error: { textAlign: 'center', color: '#94A3B8', marginTop: 60, fontSize: 16 },
+  container: { alignItems: 'center', padding: spacing.xl },
+  card: { width: '100%', padding: spacing.xxxl, alignItems: 'center', marginBottom: spacing.xl },
+  positionCircle: { width: 104, height: 104, borderRadius: 52, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
+  positionNum: { fontSize: 36, fontWeight: '800', color: colors.primary },
+  positionLabel: { ...typography.caption, color: colors.inkMuted },
+  status: { ...typography.heading, color: colors.ink, marginBottom: spacing.sm },
+  waitText: { ...typography.body, color: colors.inkMuted },
+  cancelBtn: { width: '100%' },
+  doneText: { ...typography.body, color: colors.inkMuted, textAlign: 'center', marginTop: spacing.xl },
+  error: { textAlign: 'center', color: colors.inkSubtle, marginTop: 60, fontSize: 16 },
 });

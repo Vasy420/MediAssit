@@ -29,6 +29,7 @@ authRouter.post(
   '/login',
   body('identifier').trim().notEmpty().withMessage('Email or phone is required'),
   body('password').notEmpty().withMessage('Password is required'),
+  body('role').optional().isIn(['patient', 'doctor']).withMessage('Invalid account type'),
   validate,
   handleLogin,
 );

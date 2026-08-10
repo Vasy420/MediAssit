@@ -1,44 +1,45 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useSettings } from '../../src/contexts/SettingsContext';
+import { Button } from '../../src/ui/Button';
+import { Screen } from '../../src/ui/Screen';
+import { colors, layout, radii, spacing, typography } from '../../src/ui/theme';
 
 export default function DoctorProfileScreen() {
   const { user, logout } = useAuth();
+  const { theme } = useSettings();
+  const router = useRouter();
 
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: logout },
-    ]);
-  };
+  const handleLogout = () => { void logout(); };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>
+    <Screen style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
+        <Text style={[styles.avatarText, { color: theme.onPrimary }]}>
           {user?.name?.charAt(0)?.toUpperCase() ?? 'D'}
         </Text>
       </View>
-      <Text style={styles.name}>{user?.name ?? 'Doctor'}</Text>
-      <Text style={styles.role}>Doctor</Text>
-      <Text style={styles.email}>{user?.email ?? ''}</Text>
+      <Text style={[styles.name, { color: theme.ink }]}>{user?.name ?? 'Doctor'}</Text>
+      <Text style={[styles.role, { color: theme.inkMuted }]}>Doctor</Text>
+      <Text style={[styles.email, { color: theme.inkMuted }]}>{user?.email ?? ''}</Text>
 
       <View style={styles.section}>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutBtnText}>Logout</Text>
-        </TouchableOpacity>
+        <Button title="Settings" variant="secondary" style={styles.settingsBtn} onPress={() => router.push('/settings')} />
+        <Button title="Logout" variant="danger" style={styles.logoutBtn} onPress={handleLogout} />
       </View>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC', alignItems: 'center', padding: 24, paddingTop: 40 },
-  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  avatarText: { fontSize: 32, fontWeight: '700', color: '#FFF' },
-  name: { fontSize: 22, fontWeight: '700', color: '#1E293B' },
-  role: { fontSize: 14, color: '#64748B', marginTop: 4 },
-  email: { fontSize: 14, color: '#94A3B8', marginTop: 4 },
-  section: { width: '100%', marginTop: 40 },
-  logoutBtn: { backgroundColor: '#FEE2E2', borderRadius: 12, padding: 16, alignItems: 'center' },
-  logoutBtnText: { color: '#DC2626', fontWeight: '600', fontSize: 16 },
+  container: { alignItems: 'center', padding: layout.horizontalPadding, paddingTop: spacing.xxxl },
+  avatar: { width: 84, height: 84, borderRadius: radii.pill, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
+  avatarText: { fontSize: 32, fontWeight: '800', color: colors.white },
+  name: { ...typography.title },
+  role: { ...typography.body, marginTop: spacing.xs },
+  email: { ...typography.caption, marginTop: spacing.xs },
+  section: { width: '100%', marginTop: spacing.xxxl },
+  settingsBtn: { width: '100%' },
+  logoutBtn: { width: '100%', marginTop: spacing.md },
 });

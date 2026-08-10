@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { api } from '../../src/api/client';
+import { Card } from '../../src/ui/Card';
+import { Screen } from '../../src/ui/Screen';
+import { colors, layout, spacing, typography } from '../../src/ui/theme';
 
 interface DashboardStats {
   upcoming_appts: number;
@@ -36,60 +39,62 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <Screen padded={false}>
+    <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.greeting}>
         <Text style={styles.greetingText}>Hello, {user?.name?.split(' ')[0] || 'Patient'}</Text>
         <Text style={styles.dateText}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
       </View>
 
       <View style={styles.statsRow}>
-        <View style={styles.statCard}>
+        <Card style={styles.statCard}>
           <Text style={styles.statNumber}>{stats.upcoming_appts}</Text>
           <Text style={styles.statLabel}>Upcoming{'\n'}Appointments</Text>
-        </View>
-        <View style={styles.statCard}>
+        </Card>
+        <Card style={styles.statCard}>
           <Text style={styles.statNumber}>{stats.queue_position ?? '—'}</Text>
           <Text style={styles.statLabel}>Queue{'\n'}Position</Text>
-        </View>
-        <View style={styles.statCard}>
+        </Card>
+        <Card style={styles.statCard}>
           <Text style={styles.statNumber}>{stats.report_count}</Text>
           <Text style={styles.statLabel}>Medical{'\n'}Reports</Text>
-        </View>
+        </Card>
       </View>
 
       <Text style={styles.sectionTitle}>Quick Actions</Text>
 
-      <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/ai-chat')}>
+      <Pressable style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]} onPress={() => router.push('/(tabs)/ai-chat')}>
         <Text style={styles.actionTitle}>AI Symptom Checker</Text>
         <Text style={styles.actionDesc}>Describe your symptoms and get instant triage guidance</Text>
-      </TouchableOpacity>
+      </Pressable>
 
-      <TouchableOpacity style={styles.actionCardAlt} onPress={() => router.push('/(tabs)/doctors')}>
+      <Pressable style={({ pressed }) => [styles.actionCardAlt, pressed && styles.pressed]} onPress={() => router.push('/(tabs)/doctors')}>
         <Text style={styles.actionTitle}>Find a Doctor</Text>
         <Text style={styles.actionDesc}>Browse specialists and book an appointment</Text>
-      </TouchableOpacity>
+      </Pressable>
 
-      <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/appointments')}>
+      <Pressable style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]} onPress={() => router.push('/(tabs)/appointments')}>
         <Text style={styles.actionTitle}>My Appointments</Text>
         <Text style={styles.actionDesc}>View upcoming and past appointments</Text>
-      </TouchableOpacity>
+      </Pressable>
     </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { padding: 20, paddingBottom: 40 },
-  greeting: { marginBottom: 20, marginTop: 8 },
-  greetingText: { fontSize: 22, fontWeight: '700', color: '#1E293B' },
-  dateText: { fontSize: 14, color: '#64748B', marginTop: 2 },
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 28 },
-  statCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
-  statNumber: { fontSize: 28, fontWeight: '700', color: '#2563EB' },
-  statLabel: { fontSize: 11, color: '#64748B', textAlign: 'center', marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginBottom: 12 },
-  actionCard: { backgroundColor: '#2563EB', borderRadius: 12, padding: 18, marginBottom: 10 },
-  actionCardAlt: { backgroundColor: '#0891B2', borderRadius: 12, padding: 18, marginBottom: 10 },
-  actionTitle: { fontSize: 16, fontWeight: '600', color: '#FFF' },
-  actionDesc: { fontSize: 13, color: '#E2E8F0', marginTop: 4 },
+  content: { padding: layout.horizontalPadding, paddingBottom: 40 },
+  greeting: { marginBottom: spacing.xl, marginTop: spacing.sm },
+  greetingText: { ...typography.title, color: colors.ink },
+  dateText: { ...typography.body, color: colors.inkMuted, marginTop: spacing.xs },
+  statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xxxl },
+  statCard: { flex: 1, padding: spacing.md, alignItems: 'center' },
+  statNumber: { fontSize: 27, fontWeight: '800', color: colors.primary },
+  statLabel: { ...typography.caption, color: colors.inkMuted, textAlign: 'center', marginTop: spacing.xs },
+  sectionTitle: { ...typography.heading, color: colors.ink, marginBottom: spacing.md },
+  actionCard: { backgroundColor: colors.primary, borderRadius: 16, padding: spacing.xl, marginBottom: spacing.md },
+  actionCardAlt: { backgroundColor: colors.accent, borderRadius: 16, padding: spacing.xl, marginBottom: spacing.md },
+  actionTitle: { ...typography.heading, color: colors.white },
+  actionDesc: { ...typography.body, color: '#E9F7F8', marginTop: spacing.xs },
+  pressed: { opacity: 0.84, transform: [{ scale: 0.985 }] },
 });

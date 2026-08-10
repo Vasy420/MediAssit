@@ -1,10 +1,13 @@
 import { useState, useRef, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet,
+  View, Text, TextInput, Pressable, FlatList, StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
 import type { ChatTurn, TriageResult } from '../../src/types';
+import { Button } from '../../src/ui/Button';
+import { Screen } from '../../src/ui/Screen';
+import { colors, layout, radii, spacing, typography } from '../../src/ui/theme';
 
 interface Message {
   id: string;
@@ -152,24 +155,23 @@ export default function AIChatScreen() {
         {item.options && (
           <View style={styles.optionsContainer}>
             {item.options.map((opt) => (
-              <TouchableOpacity
+              <Pressable
                 key={opt.key}
-                style={styles.optionChip}
+                style={({ pressed }) => [styles.optionChip, pressed && styles.pressed]}
                 onPress={() => handleOptionSelect(opt)}
                 disabled={loading}
               >
                 <Text style={styles.optionText}>{opt.emoji} {opt.text}</Text>
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </View>
         )}
         {item.triage?.recommended_specialties && item.triage.recommended_specialties.length > 0 && (
-          <TouchableOpacity
+          <Button
+            title="Book Appointment"
             style={styles.bookBtn}
             onPress={() => router.push('/(tabs)/doctors')}
-          >
-            <Text style={styles.bookBtnText}>Book Appointment</Text>
-          </TouchableOpacity>
+          />
         )}
       </View>
     );
@@ -178,7 +180,7 @@ export default function AIChatScreen() {
   const keyExtractor = useCallback((item: Message) => item.id, []);
 
   return (
-    <View style={styles.container}>
+    <Screen padded={false}>
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -197,15 +199,16 @@ export default function AIChatScreen() {
           onSubmitEditing={() => handleSend()}
           returnKeyType="send"
         />
-        <TouchableOpacity
-          style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]}
+        <Button
+          title="Send"
+          style={styles.sendBtn}
+          textStyle={styles.sendBtnText}
+          loading={loading}
           onPress={() => handleSend()}
           disabled={!input.trim() || loading}
-        >
-          <Text style={styles.sendBtnText}>Send</Text>
-        </TouchableOpacity>
+        />
       </View>
-    </View>
+    </Screen>
   );
 }
 
@@ -214,27 +217,25 @@ function TypingIndicator() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F5F9' },
-  listContent: { padding: 16, paddingBottom: 8 },
-  botBubble: { alignSelf: 'flex-start', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 10, maxWidth: '85%' },
-  botText: { fontSize: 15, color: '#1E293B', lineHeight: 22 },
-  userBubble: { alignSelf: 'flex-end', backgroundColor: '#2563EB', borderRadius: 12, padding: 14, marginBottom: 10, maxWidth: '85%' },
-  userText: { fontSize: 15, color: '#FFF', lineHeight: 22 },
-  answerBubble: { alignSelf: 'flex-end', backgroundColor: '#DBEAFE', borderRadius: 12, padding: 10, marginBottom: 10, maxWidth: '85%' },
-  answerText: { fontSize: 14, color: '#1E40AF' },
-  resultBubble: { alignSelf: 'flex-start', backgroundColor: '#FEF3C7', borderRadius: 12, padding: 14, marginBottom: 10, maxWidth: '90%', borderWidth: 1, borderColor: '#FCD34D' },
-  resultText: { fontSize: 15, color: '#92400E', lineHeight: 22 },
-  errorBubble: { alignSelf: 'flex-start', backgroundColor: '#FEE2E2', borderRadius: 12, padding: 14, marginBottom: 10, maxWidth: '85%', borderWidth: 1, borderColor: '#FECACA' },
-  errorText: { fontSize: 15, color: '#991B1B', lineHeight: 22 },
-  optionsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
-  optionChip: { backgroundColor: '#EEF2FF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#C7D2FE' },
-  optionText: { fontSize: 13, color: '#3730A3' },
-  bookBtn: { backgroundColor: '#2563EB', borderRadius: 8, padding: 12, alignItems: 'center', marginTop: 10 },
-  bookBtnText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
-  typing: { color: '#94A3B8', fontSize: 13, textAlign: 'center', paddingVertical: 8 },
-  inputBar: { flexDirection: 'row', padding: 10, backgroundColor: '#FFF', borderTopWidth: 1, borderColor: '#E2E8F0', alignItems: 'flex-end' },
-  input: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, padding: 12, fontSize: 15, maxHeight: 100 },
-  sendBtn: { backgroundColor: '#2563EB', borderRadius: 10, padding: 12, marginLeft: 8 },
-  sendBtnDisabled: { backgroundColor: '#94A3B8' },
-  sendBtnText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
+  listContent: { padding: layout.horizontalPadding, paddingBottom: spacing.sm },
+  botBubble: { alignSelf: 'flex-start', backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md, maxWidth: '85%', borderWidth: 1, borderColor: colors.border },
+  botText: { ...typography.body, color: colors.ink },
+  userBubble: { alignSelf: 'flex-end', backgroundColor: colors.primary, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md, maxWidth: '85%' },
+  userText: { ...typography.body, color: colors.white },
+  answerBubble: { alignSelf: 'flex-end', backgroundColor: colors.primarySoft, borderRadius: radii.md, padding: spacing.md, marginBottom: spacing.md, maxWidth: '85%' },
+  answerText: { ...typography.body, color: colors.primaryDark },
+  resultBubble: { alignSelf: 'flex-start', backgroundColor: colors.warningSoft, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md, maxWidth: '90%', borderWidth: 1, borderColor: '#F1D08C' },
+  resultText: { ...typography.body, color: '#7A4D08' },
+  errorBubble: { alignSelf: 'flex-start', backgroundColor: colors.dangerSoft, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md, maxWidth: '85%', borderWidth: 1, borderColor: '#F3B8BB' },
+  errorText: { ...typography.body, color: colors.danger },
+  optionsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  optionChip: { backgroundColor: colors.primarySoft, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderColor: '#B9DDE5', minHeight: 44, justifyContent: 'center' },
+  optionText: { ...typography.caption, color: colors.primaryDark },
+  bookBtn: { marginTop: spacing.md },
+  typing: { color: colors.inkSubtle, fontSize: 13, textAlign: 'center', paddingVertical: spacing.md },
+  inputBar: { flexDirection: 'row', padding: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.border, alignItems: 'flex-end' },
+  input: { flex: 1, backgroundColor: colors.surfaceMuted, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, fontSize: 15, maxHeight: 100, color: colors.ink },
+  sendBtn: { width: 76, marginLeft: spacing.sm },
+  sendBtnText: { fontSize: 14 },
+  pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
 });
