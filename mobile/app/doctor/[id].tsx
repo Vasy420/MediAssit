@@ -24,12 +24,21 @@ interface DoctorDetails {
   status?: string;
 }
 
+function nextBookableDate() {
+  const date = new Date();
+  do {
+    date.setDate(date.getDate() + 1);
+  } while (date.getDay() === 0);
+  return date.toISOString().slice(0, 10);
+}
+
 export default function DoctorDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { testMode, theme } = useSettings();
   const [doctor, setDoctor] = useState<DoctorDetails | null>(null);
   const [slots, setSlots] = useState<string[]>([]);
+  const [availabilityDate, setAvailabilityDate] = useState(nextBookableDate());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,7 +66,9 @@ export default function DoctorDetailScreen() {
         }
         const res = await api.get<DoctorDetails>(`/api/doctors/${id}`);
         setDoctor(res.data as unknown as DoctorDetails);
-        const availability = await api.get<{ slots?: string[] }>(`/api/doctors/${id}/availability?date=${new Date().toISOString().slice(0, 10)}`);
+        const date = nextBookableDate();
+        setAvailabilityDate(date);
+        const availability = await api.get<{ slots?: string[] }>(`/api/doctors/${id}/availability?date=${date}`);
         setSlots(((availability.data as unknown as { slots?: string[] })?.slots) ?? []);
       } catch {
         setDoctor(null);
@@ -95,7 +106,7 @@ export default function DoctorDetailScreen() {
         </Card>
 
         <Card style={styles.infoCard}>
-          <Text style={[styles.sectionTitle, { color: theme.ink }]}>Available times today</Text>
+           <Text style={[styles.sectionTitle, { color: theme.ink }]}>Available times on {new Date(`${availabilityDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
           {slots.length === 0 ? <Text style={[styles.muted, { color: theme.inkMuted }]}>No remaining times today.</Text> : (
             <View style={styles.slotRow}>
               {slots.map((slot) => <StatusBadge key={slot} label={slot} tone="primary" />)}

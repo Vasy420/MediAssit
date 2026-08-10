@@ -24,6 +24,7 @@ doctorRouter.patch(
   body('experience').optional().isInt({ min: 0, max: 80 }),
   body('consultation_fee').optional().isFloat({ min: 0 }),
   body('room_number').optional().trim(),
+  body('availability').optional().isArray().withMessage('Availability must be an array'),
   body('status').optional().isIn(['available', 'busy', 'offline']),
   validate,
   handleUpdateMyDoctor,

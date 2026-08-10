@@ -24,13 +24,14 @@ export async function updateDoctorProfile(
     experience?: number;
     consultation_fee?: number;
     room_number?: string;
+    availability?: { day: string; slots: string[] }[];
     status?: 'available' | 'busy' | 'offline';
   },
 ) {
   const user = await User.findOne({ user_id: userId }).lean();
   if (!user) throw Errors.notFound('User not found');
 
-  const values = {
+  const values: Record<string, unknown> = {
     name: user.name,
     user_id: userId,
     specialization: input.specialization.trim(),
@@ -42,6 +43,7 @@ export async function updateDoctorProfile(
     room_number: input.room_number?.trim() ?? '',
     status: input.status ?? 'available',
   };
+  if (input.availability !== undefined) values.availability = input.availability;
 
   return Doctor.findOneAndUpdate(
     { user_id: userId },

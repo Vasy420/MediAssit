@@ -1,23 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView, Pressable } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { useSettings } from '../../src/contexts/SettingsContext';
 import { api } from '../../src/api/client';
 import type { User } from '../../src/types';
 import { Button } from '../../src/ui/Button';
 import { Screen } from '../../src/ui/Screen';
 import { TextField } from '../../src/ui/TextField';
 import { PasswordField } from '../../src/ui/PasswordField';
-import { colors, radii, spacing, typography } from '../../src/ui/theme';
+import { radii, roleThemes, spacing, typography } from '../../src/ui/theme';
 
 export default function LoginScreen() {
   const { login } = useAuth();
-  const { theme } = useSettings();
+  const { role: routeRole } = useLocalSearchParams<{ role?: string }>();
+  const initialRole = routeRole === 'doctor' ? 'doctor' : 'patient';
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'patient' | 'doctor'>('patient');
+  const [role, setRole] = useState<'patient' | 'doctor'>(initialRole);
   const [loading, setLoading] = useState(false);
+  const theme = roleThemes[role];
+
+  useEffect(() => {
+    if (routeRole === 'doctor' || routeRole === 'patient') setRole(routeRole);
+  }, [routeRole]);
 
   const handleLogin = async () => {
     if (!identifier || !password) {
@@ -77,13 +82,14 @@ export default function LoginScreen() {
 
       <Button
         title={loading ? 'Logging in...' : 'Login'}
+        themeOverride={theme}
         style={styles.button}
         onPress={handleLogin}
         disabled={loading}
         loading={loading}
       />
 
-      <Link href="/(auth)/register" style={[styles.link, { color: theme.primary }]}>
+      <Link href={{ pathname: '/(auth)/register', params: { role } }} style={[styles.link, { color: theme.primary }]}>
         Don't have an account? Register
       </Link>
       </ScrollView>

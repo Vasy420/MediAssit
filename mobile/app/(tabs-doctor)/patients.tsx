@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
 import { fakePatientSummary } from '../../src/data/testData';
 import { useSettings } from '../../src/contexts/SettingsContext';
@@ -28,6 +28,23 @@ interface PatientSummary {
   recent_reports?: { report_id: string; diagnosis: string; date: string; is_fake?: boolean }[];
 }
 
+interface PatientHistoryItem {
+  patient_id: string;
+  name: string;
+  age?: number;
+  gender?: string;
+  last_visit?: string;
+  last_time?: string;
+  visit_count: number;
+  last_status?: string;
+  is_fake?: boolean;
+}
+
+const FAKE_PATIENT_HISTORY: PatientHistoryItem[] = [
+  { patient_id: 'FAKE-P001', name: 'Riya Sharma', age: 29, gender: 'female', last_visit: new Date().toISOString(), last_time: '09:30 AM', visit_count: 3, last_status: 'completed', is_fake: true },
+  { patient_id: 'FAKE-P003', name: 'Maya Patel', age: 44, gender: 'female', last_visit: new Date(Date.now() - 86400000 * 3).toISOString(), last_time: '11:00 AM', visit_count: 2, last_status: 'confirmed', is_fake: true },
+];
+
 export default function PatientsScreen() {
   const router = useRouter();
   const { testMode } = useSettings();
@@ -35,30 +52,67 @@ export default function PatientsScreen() {
   const [patient, setPatient] = useState<PatientSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [history, setHistory] = useState<PatientHistoryItem[]>([]);
 
-  const searchPatient = async () => {
-    if (!patientId.trim()) return;
+  const loadPatient = useCallback(async (id: string) => {
+    if (!id.trim()) return;
     setLoading(true);
     setSearched(true);
-    if (testMode && patientId.trim().toUpperCase().startsWith('FAKE')) {
+    if (testMode && id.trim().toUpperCase().startsWith('FAKE')) {
       setPatient(fakePatientSummary as PatientSummary);
       setLoading(false);
       return;
     }
     try {
-      const res = await api.get<PatientSummary>(`/api/doctor-dashboard/patient-summary/${patientId.trim()}`);
+      const res = await api.get<PatientSummary>(`/api/doctor-dashboard/patient-summary/${id.trim()}`);
       setPatient(res.data as unknown as PatientSummary);
     } catch {
       setPatient(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [testMode]);
+
+  const searchPatient = () => { void loadPatient(patientId); };
+
+  useFocusEffect(useCallback(() => {
+    async function loadHistory() {
+      if (testMode) {
+        setHistory(FAKE_PATIENT_HISTORY);
+        return;
+      }
+      try {
+        const res = await api.get<PatientHistoryItem[]>('/api/doctor-dashboard/patients');
+        setHistory((res.data as PatientHistoryItem[]) ?? []);
+      } catch {
+        setHistory([]);
+      }
+    }
+    void loadHistory();
+  }, [testMode]));
 
   return (
     <Screen padded={false}>
     <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Patient Lookup</Text>
+      <Text style={styles.title}>Patients</Text>
+      <Text style={styles.sectionTitle}>Patient History</Text>
+      {history.length === 0 ? (
+        <Text style={styles.emptyText}>No patient history yet.</Text>
+      ) : (
+        history.map((item) => (
+          <Pressable key={item.patient_id} onPress={() => { setPatientId(item.patient_id); void loadPatient(item.patient_id); }} style={({ pressed }) => [styles.historyCard, pressed && styles.pressed]}>
+            <View style={styles.historyHeader}>
+              <Text style={styles.historyName}>{item.name}</Text>
+              <Text style={styles.historyCount}>{item.visit_count} visit{item.visit_count === 1 ? '' : 's'}</Text>
+            </View>
+            <Text style={styles.historyMeta}>{item.patient_id} · {item.age ?? 'Age N/A'} · {item.gender ?? 'Gender N/A'}</Text>
+            {item.last_visit ? <Text style={styles.historyMeta}>Last visit: {new Date(item.last_visit).toLocaleDateString()} {item.last_time ?? ''}</Text> : null}
+            <Text style={styles.historyStatus}>{item.last_status?.replace(/_/g, ' ') ?? 'No status'}</Text>
+          </Pressable>
+        ))
+      )}
+
+      <Text style={styles.lookupTitle}>Patient Lookup</Text>
       <View style={styles.searchRow}>
         <TextField
           value={patientId}
@@ -139,13 +193,20 @@ export default function PatientsScreen() {
 const styles = StyleSheet.create({
   content: { padding: layout.horizontalPadding, paddingBottom: 40 },
   title: { ...typography.title, color: colors.ink, marginBottom: spacing.lg },
+  sectionTitle: { ...typography.heading, color: colors.ink, marginBottom: spacing.md },
+  lookupTitle: { ...typography.heading, color: colors.ink, marginTop: spacing.xxl, marginBottom: spacing.md },
   searchRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg, alignItems: 'flex-end' },
   searchInput: { flex: 1 },
   searchBtn: { minWidth: 92 },
   testHint: { ...typography.caption, color: colors.warning, marginBottom: spacing.md },
   emptyText: { ...typography.body, color: colors.inkSubtle, textAlign: 'center', marginTop: spacing.xl },
   resultCard: { padding: spacing.lg },
-  sectionTitle: { ...typography.heading, color: colors.ink, marginBottom: spacing.sm },
+  historyCard: { backgroundColor: colors.surface, borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md },
+  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  historyName: { ...typography.heading, color: colors.ink },
+  historyCount: { ...typography.caption, color: colors.primary, fontWeight: '700' },
+  historyMeta: { ...typography.caption, color: colors.inkMuted, marginTop: spacing.xs },
+  historyStatus: { ...typography.caption, color: colors.primary, marginTop: spacing.sm, textTransform: 'capitalize' },
   field: { ...typography.body, color: colors.inkMuted, marginBottom: spacing.xs },
   reportItem: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, marginTop: spacing.sm },
   reportDate: { ...typography.caption, color: colors.inkSubtle },

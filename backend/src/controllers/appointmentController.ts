@@ -5,6 +5,7 @@ import { Errors } from '../utils/ApiError.js';
 import { notify } from '../services/notificationService.js';
 import { User } from '../models/User.js';
 import { formatDateLong } from '../utils/time.js';
+import { joinQueue } from '../services/queueAgent.js';
 
 export async function handleCreateAppointment(req: Request, res: Response) {
   const isPatient = req.user!.role === 'patient';
@@ -24,6 +25,7 @@ export async function handleCreateAppointment(req: Request, res: Response) {
     reason: req.body.reason as string | undefined,
     urgency: req.body.urgency as 'green' | 'yellow' | 'orange' | 'red' | undefined,
   });
+  const queue = isPatient ? await joinQueue(result.appointment.appointment_id) : null;
 
   if (isPatient) {
     const user = await User.findOne({ user_id: req.user!.user_id }).lean();
@@ -35,7 +37,7 @@ export async function handleCreateAppointment(req: Request, res: Response) {
       result.appointment.time,
     );
   }
-  res.status(201).json({ success: true, data: result });
+  res.status(201).json({ success: true, data: { ...result, queue } });
 }
 
 export async function handleListAppointments(req: Request, res: Response) {

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { api } from '../../src/api/client';
@@ -19,6 +20,7 @@ interface DashboardData {
     appointment_id: string;
     patient_id: string;
     patient_name: string;
+    date: string;
     time: string;
     urgency: string;
     status: string;
@@ -49,6 +51,7 @@ export default function DoctorDashboardScreen() {
       const queue = activeFakeQueue.find((entry) => entry.patient_id === appointment.patient_id);
       return {
         ...appointment,
+        date: appointment.date ?? new Date().toISOString().slice(0, 10),
         queue_position: queue ? String(queue.position) : null,
         queue_status: queue?.status ?? null,
       };
@@ -88,10 +91,12 @@ export default function DoctorDashboardScreen() {
         <>
           <View style={styles.statsRow}>
             <Card style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: colors.primarySoft }]}><Ionicons name="calendar" size={16} color={colors.primary} /></View>
               <Text style={styles.statNum}>{displayData.total_today}</Text>
-              <Text style={styles.statLabel}>Today's Appointments</Text>
+              <Text style={styles.statLabel}>Upcoming Appointments</Text>
             </Card>
             <Card style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: colors.warningSoft }]}><Ionicons name="people" size={16} color={colors.warning} /></View>
               <Text style={styles.statNum}>{displayData.queue_length}</Text>
               <Text style={styles.statLabel}>In Queue</Text>
             </Card>
@@ -111,7 +116,7 @@ export default function DoctorDashboardScreen() {
             </View>
           </Card>
 
-          <Text style={styles.sectionTitle}>Today's Appointments</Text>
+          <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
           {displayData.today_appointments.length === 0 ? (
             <Text style={styles.emptyText}>No appointments scheduled for today.</Text>
           ) : (
@@ -126,6 +131,7 @@ export default function DoctorDashboardScreen() {
                   <StatusBadge label={appt.urgency} tone={appt.urgency === 'red' ? 'danger' : appt.urgency === 'orange' || appt.urgency === 'yellow' ? 'warning' : 'success'} />
                 </View>
                 <Text style={styles.apptTime}>Time: {appt.time}</Text>
+                <Text style={styles.apptDate}>Date: {new Date(`${appt.date}T00:00:00`).toLocaleDateString()}</Text>
                 <Text style={styles.apptStatus}>Status: {appt.status.replace(/_/g, ' ')}</Text>
                 {appt.queue_position && (
                   <Text style={styles.apptQueue}>Queue: {appt.queue_position} ({appt.queue_status})</Text>
@@ -163,7 +169,8 @@ const styles = StyleSheet.create({
   greeting: { ...typography.title, color: colors.ink },
   greetingRow: { marginBottom: spacing.xl, gap: spacing.sm },
   statsRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xl },
-  statCard: { flex: 1, padding: spacing.lg, alignItems: 'center' },
+  statCard: { flex: 1, padding: spacing.lg, alignItems: 'flex-start' },
+  statIcon: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
   statNum: { fontSize: 32, fontWeight: '800', color: colors.primary },
   statLabel: { ...typography.caption, color: colors.inkMuted, marginTop: spacing.xs, textAlign: 'center' },
   urgencyRow: { marginBottom: spacing.xl },
@@ -176,6 +183,7 @@ const styles = StyleSheet.create({
   apptHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   apptPatient: { ...typography.heading, color: colors.ink },
   apptTime: { ...typography.body, color: colors.inkMuted },
+  apptDate: { ...typography.body, color: colors.inkMuted },
   apptStatus: { ...typography.body, color: colors.inkMuted },
   apptQueue: { ...typography.caption, color: colors.primary, fontWeight: '600', marginTop: spacing.xs },
   emptyText: { ...typography.body, color: colors.inkSubtle, textAlign: 'center', marginTop: spacing.xl },

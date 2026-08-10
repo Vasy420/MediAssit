@@ -97,7 +97,7 @@ export default function PreConsultScreen() {
       const res = await api.post<PreConsultTurn & { pc_id: string }>('/api/preconsult/start', {
         appointment_id: appointmentId,
       });
-      const turn = res.data as unknown as PreConsultTurn & { pc_id: string };
+      const turn = (res.data ?? res) as unknown as PreConsultTurn & { pc_id: string };
       if (turn.pc_id) setPcId(turn.pc_id);
       await processTurn(turn);
     } catch (e) {
@@ -128,9 +128,9 @@ export default function PreConsultScreen() {
       }
       const res = await api.post<PreConsultTurn>('/api/preconsult/answer', {
         pc_id: pcId,
-        answers: [{ key: option.key, answer: option.key, rephrased: false }],
+        answers: newAnswers,
       });
-      const turn = res.data as unknown as PreConsultTurn;
+      const turn = (res.data ?? res) as unknown as PreConsultTurn;
       await processTurn(turn);
     } catch {
       addMessage({ role: 'bot', text: 'Something went wrong. Please try again.', options: [] });
@@ -159,9 +159,9 @@ export default function PreConsultScreen() {
       const res = await api.post<PreConsultTurn>('/api/preconsult/answer', {
         pc_id: pcId,
         message: text,
-        answers: [{ key: waitingKey, answer: text, rephrased: false }],
+        answers: newAnswers,
       });
-      const turn = res.data as unknown as PreConsultTurn;
+      const turn = (res.data ?? res) as unknown as PreConsultTurn;
       await processTurn(turn);
     } catch {
       addMessage({ role: 'bot', text: 'Something went wrong. Please try again.', options: [] });
@@ -176,7 +176,7 @@ export default function PreConsultScreen() {
         {messages.map((msg, i) => (
           <View key={i} style={msg.role === 'bot' ? styles.botBubble : styles.userBubble}>
             <Text style={msg.role === 'bot' ? styles.botText : styles.userText}>{msg.text}</Text>
-            {msg.options && msg.options.length > 0 && !done && (
+            {msg.options && msg.options.length > 0 && !done && i === messages.length - 1 && (
               <View style={styles.optionsRow}>
                 {msg.options.map((opt) => (
                   <Pressable

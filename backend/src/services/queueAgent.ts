@@ -82,7 +82,15 @@ export async function findQueue(queueId: string): Promise<QueueView> {
   const queue = await Queue.findOne({ queue_id: queueId }).lean();
   if (!queue) throw Errors.notFound('Queue entry not found');
   const appt = await Appointment.findOne({ appointment_id: queue.appointment_id }).lean();
-  return toQueueView(queue as unknown as QueueType, (appt as unknown as AppointmentType) ?? null);
+  const doctorQueue = await listDoctorQueue(queue.doctor_id);
+  const current = doctorQueue.find((entry) => entry.queue_id === queueId);
+  return {
+    ...toQueueView(queue as unknown as QueueType, (appt as unknown as AppointmentType) ?? null),
+    position: current?.position,
+    waiting_time: current?.waiting_time ?? queue.waiting_time,
+    appointment_time: appt?.time,
+    appointment_date: appt?.date,
+  };
 }
 
 export async function listDoctorQueue(doctorId: string): Promise<QueueView[]> {
@@ -157,6 +165,9 @@ export async function updateQueueStatus(queueId: string, status: string): Promis
         { $set: { status: 'confirmed' } },
       );
     }
+  }
+  if (status === 'cancelled') {
+    await Appointment.updateOne({ appointment_id: queue.appointment_id }, { status: 'confirmed' });
   }
   logger.audit('queue-status-change', { queue_id: queueId, status });
   return findQueue(queueId);

@@ -19,10 +19,11 @@ export async function handleDoctorDashboard(req: Request, res: Response) {
 
   const appointments = await Appointment.find({
     doctor_id: doctor.doctor_id,
-    date: today,
-    status: { $in: ['confirmed', 'in_queue', 'in_consultation'] },
+    date: { $gte: today },
+    status: { $in: ['scheduled', 'confirmed', 'in_queue', 'in_consultation'] },
   })
-    .sort({ time: 1 })
+    .sort({ date: 1, time: 1 })
+    .limit(50)
     .lean();
 
   const patientIds = appointments.map((a) => a.patient_id);
@@ -49,6 +50,7 @@ export async function handleDoctorDashboard(req: Request, res: Response) {
       appointment_id: a.appointment_id,
       patient_id: a.patient_id,
       patient_name: p?.name ?? 'Unknown',
+      date: a.date,
       time: a.time,
       urgency: a.urgency,
       status: a.status,
@@ -138,6 +140,32 @@ export async function handlePatientSummary(req: Request, res: Response) {
       status: a.status,
     })),
   });
+}
+
+export async function handlePatientHistory(req: Request, res: Response) {
+  const doctor = await getDoctorForUser(req.user!.user_id);
+  const appointments = await Appointment.find({ doctor_id: doctor.doctor_id })
+    .sort({ date: -1, time: -1 })
+    .lean();
+  const patientIds = [...new Set(appointments.map((appointment) => appointment.patient_id))];
+  const patients = await Patient.find({ patient_id: { $in: patientIds } }).lean();
+  const patientMap = new Map(patients.map((patient) => [patient.patient_id, patient]));
+  const history = patientIds.map((patientId) => {
+    const patientAppointments = appointments.filter((appointment) => appointment.patient_id === patientId);
+    const latest = patientAppointments[0];
+    const patient = patientMap.get(patientId);
+    return {
+      patient_id: patientId,
+      name: patient?.name ?? 'Unknown',
+      age: patient?.age,
+      gender: patient?.gender,
+      last_visit: latest?.date,
+      last_time: latest?.time,
+      visit_count: patientAppointments.length,
+      last_status: latest?.status,
+    };
+  });
+  res.json({ success: true, data: history });
 }
 
 export async function handleCreateNote(req: Request, res: Response) {

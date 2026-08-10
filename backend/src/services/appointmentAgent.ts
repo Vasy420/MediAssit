@@ -1,5 +1,6 @@
 import { Doctor } from '../models/Doctor.js';
 import { Appointment } from '../models/Appointment.js';
+import { Queue } from '../models/Queue.js';
 import { Errors } from '../utils/ApiError.js';
 import { nextId } from '../utils/idGen.js';
 import { weekdayName } from '../utils/time.js';
@@ -69,5 +70,11 @@ export async function updateAppointmentStatus(appointmentId: string, status: str
   const appointment = await Appointment.findOne({ appointment_id: appointmentId }).lean();
   if (!appointment) throw Errors.notFound('Appointment not found');
   await Appointment.updateOne({ appointment_id: appointmentId }, { status });
+  if (status === 'cancelled') {
+    await Queue.updateMany(
+      { appointment_id: appointmentId, status: { $in: ['waiting', 'called', 'in_consultation'] } },
+      { $set: { status: 'cancelled', completed_at: new Date() } },
+    );
+  }
   return Appointment.findOne({ appointment_id: appointmentId }).lean();
 }

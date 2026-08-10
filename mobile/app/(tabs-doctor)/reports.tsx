@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
 import { useSettings } from '../../src/contexts/SettingsContext';
@@ -133,7 +134,10 @@ export default function DoctorReportsScreen() {
         <Button title="Add Report" style={styles.addButton} onPress={() => { setForm(EMPTY_FORM); setFormError(''); setFormVisible(true); }} />
       </View>
       {visibleReports.length === 0 ? (
-        <Text style={styles.emptyText}>No reports yet.</Text>
+        <View style={styles.emptyWrap}>
+          <Ionicons name="document-text-outline" size={40} color={colors.inkSubtle} />
+          <Text style={styles.emptyText}>No reports yet.</Text>
+        </View>
       ) : (
         visibleReports.map((report) => (
           <Pressable
@@ -182,7 +186,8 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.lg },
   titleGroup: { flex: 1, gap: spacing.xs },
   addButton: { minWidth: 112 },
-  emptyText: { ...typography.body, color: colors.inkSubtle, textAlign: 'center', marginTop: 40 },
+  emptyText: { ...typography.body, color: colors.inkSubtle, textAlign: 'center', marginTop: spacing.md },
+  emptyWrap: { alignItems: 'center', gap: spacing.md, marginTop: 48 },
   card: { marginBottom: spacing.md },
   reportId: { ...typography.caption, color: colors.inkSubtle, fontWeight: '600' },
   diagnosis: { ...typography.heading, color: colors.ink, marginTop: spacing.xs },

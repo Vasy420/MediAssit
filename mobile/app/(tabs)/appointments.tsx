@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
 import type { Appointment } from '../../src/types';
@@ -8,9 +9,13 @@ import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
 import { Screen } from '../../src/ui/Screen';
 import { StatusBadge } from '../../src/ui/StatusBadge';
-import { colors, layout, spacing, typography } from '../../src/ui/theme';
+import { colors, layout, radii, spacing, typography } from '../../src/ui/theme';
 
 const STATUS_TONES = { pending: 'warning', scheduled: 'primary', confirmed: 'success', in_queue: 'primary', in_consultation: 'warning', cancelled: 'danger', completed: 'neutral', no_show: 'danger' } as const;
+
+function urgencyColor(level?: string): string {
+  return ({ red: '#DC2626', orange: '#F97316', yellow: '#CA8A04', green: '#16A34A' } as Record<string, string>)[level ?? ''] ?? colors.inkMuted;
+}
 
 export default function AppointmentsScreen() {
   const router = useRouter();
@@ -59,6 +64,8 @@ export default function AppointmentsScreen() {
             setAppointments((prev) =>
               prev.map((a) => (a.appointment_id === appt.appointment_id ? { ...a, status: 'cancelled' } : a)),
             );
+            await loadAppointments();
+            Alert.alert('Appointment cancelled', 'Your appointment was cancelled.');
           } catch (e) {
             Alert.alert('Error', (e as Error).message);
           }
@@ -93,34 +100,49 @@ export default function AppointmentsScreen() {
       data={visibleAppointments}
       keyExtractor={(item) => item.appointment_id}
       contentContainerStyle={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadAppointments(); }} />}
-      renderItem={({ item: appt }) => (
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadAppointments(); }} tintColor={colors.primary} />}
+      renderItem={({ item: appt }) => {
+        const date = new Date(appt.date);
+        return (
         <Card style={styles.card}>
           <View style={styles.cardTop}>
-            <Text style={styles.date}>{new Date(appt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-            <Text style={styles.time}>{appt.time}</Text>
-            <StatusBadge label={appt.status} tone={STATUS_TONES[appt.status as keyof typeof STATUS_TONES] || 'neutral'} />
+            <View style={[styles.dateChip, { backgroundColor: colors.primarySoft }]}>
+              <Text style={styles.dateChipDay}>{date.getDate()}</Text>
+              <Text style={styles.dateChipMonth}>{date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</Text>
+            </View>
+            <View style={styles.cardHeaderInfo}>
+              <Text style={styles.doctorName} numberOfLines={1}>{appt.doctor_name ?? 'Doctor'}</Text>
+              <Text style={styles.time}>{date.toLocaleDateString('en-US', { weekday: 'short' })} · {appt.time}</Text>
+            </View>
+            <StatusBadge label={appt.status.replace(/_/g, ' ')} tone={STATUS_TONES[appt.status as keyof typeof STATUS_TONES] || 'neutral'} />
           </View>
-          {appt.is_fake && <StatusBadge label="Fake test data" tone="warning" />}
-          {appt.doctor_name && <Text style={styles.doctorName}>{appt.doctor_name}</Text>}
-          {appt.hospital && <Text style={styles.hospital}>Clinic: {appt.hospital}</Text>}
-          {appt.reason && <Text style={styles.reason}>Reason: {appt.reason}</Text>}
-          {appt.urgency && (
-            <Text style={[styles.urgency, { color: appt.urgency === 'red' ? '#DC2626' : '#F59E0B' }]}>
+          {appt.is_fake ? <View style={styles.fakeBadge}><StatusBadge label="Fake test data" tone="warning" /></View> : null}
+          {appt.hospital ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="business-outline" size={13} color={colors.inkMuted} />
+              <Text style={styles.hospital}>{appt.hospital}</Text>
+            </View>
+          ) : null}
+          {appt.reason ? <Text style={styles.reason}>Reason: {appt.reason}</Text> : null}
+          {appt.urgency ? (
+            <Text style={[styles.urgency, { color: urgencyColor(appt.urgency) }]}>
               Urgency: {appt.urgency.toUpperCase()}
             </Text>
-          )}
-          {(appt.status === 'scheduled' || appt.status === 'confirmed') && (
+          ) : null}
+          {(['scheduled', 'confirmed', 'in_queue'] as Appointment['status'][]).includes(appt.status) && (
             <View style={styles.actions}>
               <Button title="Pre-Consult" variant="secondary" style={styles.actionButton} onPress={() => router.push(`/preconsult/${appt.appointment_id}`)} />
-              <Button title="Join Queue" variant="success" style={styles.actionButton} onPress={() => handleJoinQueue(appt)} />
+              <Button title={appt.status === 'in_queue' ? 'View Queue' : 'Join Queue'} variant="success" style={styles.actionButton} onPress={() => handleJoinQueue(appt)} />
               <Button title="Cancel" variant="danger" style={styles.actionButton} onPress={() => handleCancel(appt)} />
             </View>
           )}
         </Card>
-      )}
+        );
+      }}
       ListEmptyComponent={
         <View style={styles.emptyView}>
+          <Ionicons name="calendar-clear-outline" size={40} color={colors.inkSubtle} />
           <Text style={styles.emptyText}>No appointments yet.</Text>
           <Button title="Find a Doctor" variant="secondary" onPress={() => router.push('/(tabs)/doctors')} />
         </View>
@@ -134,14 +156,19 @@ const styles = StyleSheet.create({
   container: { padding: layout.horizontalPadding, paddingBottom: 40 },
   card: { marginBottom: spacing.md },
   cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
-  date: { ...typography.heading, color: colors.ink, flex: 1 },
-  time: { ...typography.label, color: colors.primary, marginRight: spacing.sm },
-  doctorName: { ...typography.body, color: colors.primary, marginTop: spacing.sm },
-  hospital: { ...typography.caption, color: colors.inkMuted, marginTop: spacing.xs },
-  reason: { ...typography.body, color: colors.inkMuted, marginBottom: spacing.xs },
-  urgency: { ...typography.caption, marginBottom: spacing.sm },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
+  dateChip: { width: 48, height: 52, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
+  dateChipDay: { fontSize: 18, fontWeight: '800', color: colors.primaryDark },
+  dateChipMonth: { ...typography.caption, fontSize: 10, fontWeight: '700', color: colors.primaryDark, letterSpacing: 0.5 },
+  cardHeaderInfo: { flex: 1, marginHorizontal: spacing.md },
+  doctorName: { ...typography.heading, color: colors.ink },
+  time: { ...typography.caption, color: colors.primary, marginTop: 2, fontWeight: '600' },
+  fakeBadge: { marginBottom: spacing.xs },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  hospital: { ...typography.caption, color: colors.inkMuted },
+  reason: { ...typography.body, color: colors.inkMuted, marginTop: spacing.xs },
+  urgency: { ...typography.caption, fontWeight: '700', marginTop: spacing.sm },
+  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md, flexWrap: 'wrap' },
   actionButton: { flexGrow: 1, flexBasis: '30%', paddingHorizontal: spacing.sm },
-  emptyView: { alignItems: 'center', marginTop: 60 },
-  emptyText: { ...typography.body, color: colors.inkSubtle, marginBottom: spacing.md },
+  emptyView: { alignItems: 'center', marginTop: 60, gap: spacing.md },
+  emptyText: { ...typography.body, color: colors.inkSubtle },
 });

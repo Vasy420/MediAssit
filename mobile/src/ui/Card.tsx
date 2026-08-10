@@ -17,7 +17,7 @@ export function Card({ style, padded = true, children, ...props }: CardProps) {
       tint={themeName === 'midnight' ? 'dark' : 'light'}
       style={[styles.card, { borderColor: theme.border }, style]}
     >
-      <View style={[styles.glassOverlay, { backgroundColor: `${theme.surface}E6` }, padded && styles.padded]}>
+      <View style={[styles.glassOverlay, { backgroundColor: `${theme.surface}F0` }, padded && styles.padded]}>
         {children}
       </View>
     </BlurView>

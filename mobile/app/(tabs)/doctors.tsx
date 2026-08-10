@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, Alert } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
 import type { Appointment, Doctor } from '../../src/types';
@@ -41,8 +42,28 @@ function normalizeDoctor(raw: BackendDoctor): Doctor {
   };
 }
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+function localDateIso(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDate(date: string) {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function nextBookableDate() {
+  const date = new Date();
+  do {
+    date.setDate(date.getDate() + 1);
+  } while (date.getDay() === 0);
+  return localDateIso(date);
+}
+
+function formatDate(date: string) {
+  return parseDate(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export default function DoctorsScreen() {
@@ -52,13 +73,13 @@ export default function DoctorsScreen() {
   const [loading, setLoading] = useState(true);
   const [bookingDoctor, setBookingDoctor] = useState<string | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
-  const [bookingDate, setBookingDate] = useState(todayIso());
+  const [bookingDate, setBookingDate] = useState(nextBookableDate());
   const [bookingTime, setBookingTime] = useState<string | null>(null);
-  const [hospital, setHospital] = useState('');
   const [reason, setReason] = useState('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [bookingError, setBookingError] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const visibleDoctors = testMode
     ? [...fakeDoctors, ...doctors.filter((doctor) => !doctor.doctor_id.startsWith('FAKE-'))]
@@ -82,6 +103,7 @@ export default function DoctorsScreen() {
   const loadSlots = async (doctor: Doctor, date: string) => {
     setLoadingSlots(true);
     setBookingTime(null);
+    setBookingError('');
     if (doctor.doctor_id.startsWith('FAKE-')) {
       setAvailableSlots(['10:00 AM', '11:00 AM', '02:00 PM', '04:30 PM']);
       setLoadingSlots(false);
@@ -100,22 +122,25 @@ export default function DoctorsScreen() {
   };
 
   const openBooking = (doctor: Doctor) => {
-    const date = todayIso();
+    const date = nextBookableDate();
     setSelectedDoctor(doctor);
     setBookingDate(date);
-    setHospital(doctor.hospital || '');
     setReason('General consultation');
     setBookingError('');
+    setShowDatePicker(false);
     void loadSlots(doctor, date);
   };
 
   const closeBooking = () => {
-    if (!bookingDoctor) setSelectedDoctor(null);
+    if (!bookingDoctor) {
+      setShowDatePicker(false);
+      setSelectedDoctor(null);
+    }
   };
 
   const handleConfirmBooking = async () => {
     if (!selectedDoctor || !bookingTime || !reason.trim()) {
-      setBookingError('Choose a date and available time, then enter reason for visit. Clinic is optional.');
+      setBookingError('Choose an available time and enter reason for visit.');
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) {
@@ -135,7 +160,7 @@ export default function DoctorsScreen() {
           doctor_name: selectedDoctor.user.name,
           date: bookingDate,
           time: bookingTime,
-          hospital: hospital.trim() || undefined,
+          hospital: selectedDoctor.hospital || undefined,
           status: 'confirmed',
           reason: reason.trim(),
           urgency: 'green',
@@ -148,14 +173,16 @@ export default function DoctorsScreen() {
           doctor_id: selectedDoctor.doctor_id,
           date: bookingDate,
           time: bookingTime,
-          hospital: hospital.trim(),
+          hospital: selectedDoctor.hospital || undefined,
           reason: reason.trim(),
         });
         Alert.alert('Appointment request submitted', `Your appointment with ${selectedDoctor.user.name} is scheduled for ${bookingDate} at ${bookingTime}.`);
       }
       setSelectedDoctor(null);
     } catch (error) {
-      Alert.alert('Appointment failed', (error as Error).message);
+      const message = (error as Error).message || 'Could not schedule appointment.';
+      setBookingError(message);
+      Alert.alert('Appointment failed', message);
     } finally {
       setBookingDoctor(null);
     }
@@ -214,10 +241,28 @@ export default function DoctorsScreen() {
                 </Pressable>
               </View>
 
-              <TextField label="Date" value={bookingDate} onChangeText={(value) => { setBookingDate(value); setBookingTime(null); setBookingError(''); }} placeholder="YYYY-MM-DD" autoCapitalize="none" containerStyle={styles.modalField} />
-              <Button title="Check available times" variant="secondary" onPress={() => selectedDoctor && loadSlots(selectedDoctor, bookingDate)} loading={loadingSlots} />
+              <Pressable onPress={() => setShowDatePicker(true)} style={({ pressed }) => [styles.datePicker, { backgroundColor: theme.surface, borderColor: theme.borderStrong }, pressed && styles.pressed]}>
+                <Text style={[styles.datePickerLabel, { color: theme.inkMuted }]}>Appointment date</Text>
+                <Text style={[styles.datePickerValue, { color: theme.ink }]}>{formatDate(bookingDate)}</Text>
+                <Text style={[styles.datePickerAction, { color: theme.primary }]}>Choose date</Text>
+              </Pressable>
+              {showDatePicker ? (
+                <DateTimePicker
+                  value={parseDate(bookingDate)}
+                  mode="date"
+                  minimumDate={new Date()}
+                  onChange={(_event, date) => {
+                    setShowDatePicker(false);
+                    if (!date) return;
+                    const nextDate = localDateIso(date);
+                    setBookingDate(nextDate);
+                    if (selectedDoctor) void loadSlots(selectedDoctor, nextDate);
+                  }}
+                />
+              ) : null}
 
               <Text style={[styles.fieldLabel, { color: theme.inkMuted }]}>Choose a time</Text>
+              {loadingSlots ? <ActivityIndicator color={theme.primary} /> : null}
               {availableSlots.length === 0 && !loadingSlots ? <Text style={[styles.noSlots, { color: theme.inkSubtle }]}>No available times for this date.</Text> : null}
               <View style={styles.slotGrid}>
                 {availableSlots.map((slot) => (
@@ -227,14 +272,10 @@ export default function DoctorsScreen() {
                 ))}
               </View>
 
-              {selectedDoctor?.hospital ? (
-                <Pressable onPress={() => setHospital(selectedDoctor.hospital || '')} style={({ pressed }) => [styles.hospitalPreset, { backgroundColor: theme.primarySoft, borderColor: theme.border }, pressed && styles.pressed]}>
-                  <Text style={[styles.presetLabel, { color: theme.inkMuted }]}>Existing clinic</Text>
-                  <Text style={[styles.presetValue, { color: theme.primaryDark }]}>{selectedDoctor.hospital}</Text>
-                  <Text style={[styles.presetAction, { color: theme.primary }]}>Use this clinic</Text>
-                </Pressable>
-              ) : null}
-              <TextField label="Hospital or clinic (optional)" placeholder="Where should we schedule it?" value={hospital} onChangeText={(value) => { setHospital(value); setBookingError(''); }} containerStyle={styles.modalField} />
+              <View style={[styles.locationCard, { backgroundColor: theme.primarySoft, borderColor: theme.border }]}>
+                <Text style={[styles.presetLabel, { color: theme.inkMuted }]}>Hospital / clinic</Text>
+                <Text style={[styles.presetValue, { color: theme.primaryDark }]}>{selectedDoctor?.hospital || 'Doctor has not added a clinic yet'}</Text>
+              </View>
               <TextField label="Reason for visit" placeholder="What do you need help with?" value={reason} onChangeText={(value) => { setReason(value); setBookingError(''); }} multiline containerStyle={styles.modalField} />
               {bookingError ? <Text style={[styles.bookingError, { color: theme.danger }]}>{bookingError}</Text> : null}
               <Button title={selectedDoctor?.doctor_id.startsWith('FAKE-') ? 'Add fake appointment' : 'Confirm appointment'} onPress={handleConfirmBooking} loading={bookingDoctor !== null} disabled={bookingDoctor !== null} />
@@ -271,11 +312,15 @@ const styles = StyleSheet.create({
   closeText: { fontSize: 18, fontWeight: '700' },
   modalField: { marginTop: spacing.xs },
   bookingError: { ...typography.caption, marginTop: -spacing.xs },
+  datePicker: { borderWidth: 1, borderRadius: radii.md, padding: spacing.md, gap: spacing.xs },
+  datePickerLabel: { ...typography.caption },
+  datePickerValue: { ...typography.heading },
+  datePickerAction: { ...typography.caption, fontWeight: '700' },
   fieldLabel: { ...typography.label, marginTop: spacing.sm },
   noSlots: { ...typography.caption },
   slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   slot: { minHeight: 44, minWidth: 100, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center' },
-  hospitalPreset: { borderWidth: 1, borderRadius: radii.md, padding: spacing.md, gap: spacing.xs },
+  locationCard: { borderWidth: 1, borderRadius: radii.md, padding: spacing.md, gap: spacing.xs },
   presetLabel: { ...typography.caption },
   presetValue: { ...typography.label, fontSize: 15 },
   presetAction: { ...typography.caption, fontWeight: '700' },

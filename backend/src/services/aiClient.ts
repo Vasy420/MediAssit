@@ -137,13 +137,71 @@ export interface PreConsultTurn {
   done: boolean;
 }
 
+const FALLBACK_PRECONSULT_QUESTIONS: NonNullable<PreConsultTurn['question']>[] = [
+  {
+    id: 'fallback_reason',
+    key: 'fallback_reason',
+    text: 'What is the main reason for this appointment?',
+    rephrased: false,
+    options: [
+      { id: 'symptoms', key: 'fallback_reason.symptoms', text: 'I have symptoms', emoji: '' },
+      { id: 'checkup', key: 'fallback_reason.checkup', text: 'Routine checkup', emoji: '' },
+    ],
+  },
+  {
+    id: 'fallback_severity',
+    key: 'fallback_severity',
+    text: 'How severe is it?',
+    rephrased: false,
+    options: [
+      { id: 'mild', key: 'fallback_severity.mild', text: 'Mild', emoji: '' },
+      { id: 'moderate', key: 'fallback_severity.moderate', text: 'Moderate', emoji: '' },
+      { id: 'severe', key: 'fallback_severity.severe', text: 'Severe', emoji: '' },
+    ],
+  },
+  {
+    id: 'fallback_duration',
+    key: 'fallback_duration',
+    text: 'How long has this been happening?',
+    rephrased: false,
+    options: [
+      { id: 'today', key: 'fallback_duration.today', text: 'Since today', emoji: '' },
+      { id: 'days', key: 'fallback_duration.days', text: 'A few days', emoji: '' },
+      { id: 'longer', key: 'fallback_duration.longer', text: 'More than a week', emoji: '' },
+    ],
+  },
+];
+
+function fallbackPreConsult(payload: PreConsultPayload): PreConsultTurn {
+  const index = payload.answers.length;
+  if (index < FALLBACK_PRECONSULT_QUESTIONS.length) {
+    return { type: 'question', question: FALLBACK_PRECONSULT_QUESTIONS[index], done: false };
+  }
+
+  const patientText = payload.messages.filter((message) => message.role === 'patient').map((message) => message.text).join(' ');
+  return {
+    type: 'result',
+    done: true,
+    preconsult_summary: {
+      chief_complaint: patientText || 'General consultation',
+      symptoms: payload.answers.map((answer) => answer.answer),
+      medications: [],
+      allergies: [],
+      medical_history: '',
+      lifestyle_notes: '',
+      vital_signs: {},
+      triage_context: { source: 'local-preconsult-fallback', answers: payload.answers },
+    },
+  };
+}
+
 export async function aiPreConsult(payload: PreConsultPayload): Promise<PreConsultTurn> {
   try {
     const data = (await post('/ai/preconsult', payload)) as PreConsultTurn;
     return data;
   } catch (err) {
     logger.warn('AI preconsult unavailable: ' + (err as Error).message);
-    throw err;
+    return fallbackPreConsult(payload);
   }
 }
 

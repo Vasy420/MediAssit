@@ -41,9 +41,13 @@ export interface QueueEntry {
   queue_id: string;
   patient_id: string;
   doctor_id: string;
-  position: number;
+  position?: number;
   status: 'waiting' | 'called' | 'in_consultation' | 'completed' | 'cancelled';
-  estimated_wait_minutes: number;
+  estimated_wait_minutes?: number;
+  waiting_time?: number;
+  appointment_time?: string;
+  appointment_date?: string;
+  appointment?: { time?: string; date?: string } | null;
 }
 
 export interface MedicalReport {
