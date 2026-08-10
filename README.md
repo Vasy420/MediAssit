@@ -49,6 +49,10 @@ AI-powered healthcare navigation and management platform. Streamlines patient tr
 
 ### 1. AI Service (Terminal 1)
 
+Terminal 1:  cd ai-service && venv\Scripts\activate && python run.py
+Terminal 2:  cd backend && npm run dev
+Terminal 3:  cd mobile && npm start
+
 ```bash
 cd ai-service
 python -m venv venv
