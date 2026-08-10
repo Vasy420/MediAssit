@@ -27,6 +27,24 @@ interface PreConsultResult {
 
 type PreConsultTurn = PreConsultQuestion | PreConsultResult;
 
+function fakeQuestion(index: number): PreConsultQuestion {
+  const questions = [
+    { key: 'chief_complaint', text: 'What is your main reason for this visit?', options: [{ id: 'symptoms', key: 'chief_complaint.symptoms', text: 'I have symptoms', emoji: '' }, { id: 'checkup', key: 'chief_complaint.checkup', text: 'Routine checkup', emoji: '' }] },
+    { key: 'severity', text: 'How would you describe the severity?', options: [{ id: 'mild', key: 'severity.mild', text: 'Mild', emoji: '' }, { id: 'moderate', key: 'severity.moderate', text: 'Moderate', emoji: '' }, { id: 'severe', key: 'severity.severe', text: 'Severe', emoji: '' }] },
+    { key: 'duration', text: 'How long has this been happening?', options: [{ id: 'today', key: 'duration.today', text: 'Since today', emoji: '' }, { id: 'week', key: 'duration.week', text: 'A few days', emoji: '' }, { id: 'longer', key: 'duration.longer', text: 'More than a week', emoji: '' }] },
+  ];
+  const question = questions[Math.min(index, questions.length - 1)];
+  return { type: 'question', question: { id: `fake-${question.key}`, key: question.key, text: question.text, rephrased: false, options: question.options }, done: false };
+}
+
+function fakeResult(): PreConsultResult {
+  return {
+    type: 'result',
+    preconsult_summary: { chief_complaint: 'Demo appointment concern', symptoms: ['Demo symptom'], medications: [], allergies: [], medical_history: 'Fake test data', triage_context: { urgency: 'green' } },
+    done: true,
+  };
+}
+
 interface ChatMessage {
   role: 'bot' | 'user';
   text: string;
@@ -35,6 +53,7 @@ interface ChatMessage {
 
 export default function PreConsultScreen() {
   const { appointmentId } = useLocalSearchParams<{ appointmentId: string }>();
+  const isFake = appointmentId.startsWith('FAKE-');
   const router = useRouter();
   const [pcId, setPcId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -70,6 +89,11 @@ export default function PreConsultScreen() {
   const startInterview = useCallback(async () => {
     try {
       setLoading(true);
+      if (isFake) {
+        setPcId('FAKE-PC-001');
+        await processTurn(fakeQuestion(0));
+        return;
+      }
       const res = await api.post<PreConsultTurn & { pc_id: string }>('/api/preconsult/start', {
         appointment_id: appointmentId,
       });
@@ -81,7 +105,7 @@ export default function PreConsultScreen() {
     } finally {
       setLoading(false);
     }
-  }, [appointmentId, processTurn, addMessage]);
+  }, [appointmentId, isFake, processTurn, addMessage]);
 
   useEffect(() => {
     void startInterview();
@@ -98,6 +122,10 @@ export default function PreConsultScreen() {
     setAnswers(newAnswers);
 
     try {
+      if (isFake) {
+        await processTurn(newAnswers.length >= 3 ? fakeResult() : fakeQuestion(newAnswers.length));
+        return;
+      }
       const res = await api.post<PreConsultTurn>('/api/preconsult/answer', {
         pc_id: pcId,
         answers: [{ key: option.key, answer: option.key, rephrased: false }],
@@ -109,7 +137,7 @@ export default function PreConsultScreen() {
     } finally {
       setLoading(false);
     }
-  }, [pcId, answers, addMessage, processTurn]);
+  }, [pcId, answers, isFake, addMessage, processTurn]);
 
   const handleFreeTextSubmit = useCallback(async () => {
     if (!freeText.trim() || !pcId) return;
@@ -124,6 +152,10 @@ export default function PreConsultScreen() {
     setAnswers(newAnswers);
 
     try {
+      if (isFake) {
+        await processTurn(newAnswers.length >= 3 ? fakeResult() : fakeQuestion(newAnswers.length));
+        return;
+      }
       const res = await api.post<PreConsultTurn>('/api/preconsult/answer', {
         pc_id: pcId,
         message: text,
@@ -136,7 +168,7 @@ export default function PreConsultScreen() {
     } finally {
       setLoading(false);
     }
-  }, [freeText, pcId, waitingKey, answers, addMessage, processTurn]);
+  }, [freeText, pcId, waitingKey, answers, isFake, addMessage, processTurn]);
 
   return (
     <Screen padded={false}>

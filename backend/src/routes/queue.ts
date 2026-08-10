@@ -5,9 +5,11 @@ import { requireAuth, requireRoles } from '../middleware/auth.js';
 import {
   handleActiveQueue,
   handleDoctorQueue,
+  handleGetQueue,
   handleJoinQueue,
   handleOverridePriority,
   handlePatientQueue,
+  handlePatientCancelQueue,
   handleUpdateQueue,
 } from '../controllers/queueController.js';
 
@@ -17,6 +19,8 @@ queueRouter.use(requireAuth);
 
 queueRouter.get('/active', handleActiveQueue);
 queueRouter.post('/join', body('appointment_id').notEmpty().withMessage('appointment_id is required'), validate, handleJoinQueue);
+queueRouter.get('/:id', handleGetQueue);
+queueRouter.patch('/:id/cancel', handlePatientCancelQueue);
 queueRouter.get('/doctor/:doctorId', handleDoctorQueue);
 queueRouter.get('/patient/:patientId', handlePatientQueue);
 queueRouter.patch('/:id', requireRoles('doctor', 'admin'), handleUpdateQueue);

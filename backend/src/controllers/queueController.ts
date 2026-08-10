@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import {
   joinQueue,
+  findQueue,
   listDoctorQueue,
   listPatientQueue,
   updateQueueStatus,
@@ -34,6 +35,19 @@ export async function handleJoinQueue(req: Request, res: Response) {
   }
   const queue = await joinQueue(appointment_id);
   res.status(201).json({ success: true, data: queue });
+}
+
+export async function handleGetQueue(req: Request, res: Response) {
+  res.json({ success: true, data: await findQueue(String(req.params.id)) });
+}
+
+export async function handlePatientCancelQueue(req: Request, res: Response) {
+  if (req.user!.role !== 'patient') throw Errors.forbidden('Only patients can leave their queue');
+  const queue = await findQueue(String(req.params.id));
+  const patient = await getPatientForUser(req.user!.user_id);
+  if (!patient || queue.patient_id !== patient.patient_id) throw Errors.forbidden();
+  const updated = await updateQueueStatus(String(req.params.id), 'cancelled');
+  res.json({ success: true, data: updated });
 }
 
 export async function handleDoctorQueue(req: Request, res: Response) {

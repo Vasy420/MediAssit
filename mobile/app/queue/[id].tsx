@@ -10,14 +10,19 @@ import { colors, spacing, typography } from '../../src/ui/theme';
 
 export default function QueueScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const isFake = id.startsWith('FAKE-');
   const [entry, setEntry] = useState<QueueEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function loadEntry() {
+    if (isFake) {
+      setEntry({ queue_id: id, patient_id: 'FAKE-PATIENT', doctor_id: 'FAKE-DOC-001', position: 3, status: 'waiting', estimated_wait_minutes: 30 });
+      return;
+    }
     try {
-      const res = await api.get<{ entry: QueueEntry }>(`/api/queue/${id}`);
-      setEntry(((res.data as { entry: QueueEntry })?.entry) ?? null);
+      const res = await api.get<QueueEntry>(`/api/queue/${id}`);
+      setEntry((res.data as unknown as QueueEntry) ?? null);
     } catch {
       // ignore
     }
@@ -25,11 +30,11 @@ export default function QueueScreen() {
 
   useEffect(() => {
     loadEntry().finally(() => setLoading(false));
-    timerRef.current = setInterval(loadEntry, 15000);
+    if (!isFake) timerRef.current = setInterval(loadEntry, 15000);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [id]);
+  }, [id, isFake]);
 
   const handleCancel = async () => {
     Alert.alert('Leave Queue', 'Are you sure?', [
@@ -39,7 +44,7 @@ export default function QueueScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await api.patch(`/api/queue/${id}/cancel`);
+            if (!isFake) await api.patch(`/api/queue/${id}/cancel`);
             setEntry((prev) => (prev ? { ...prev, status: 'cancelled' } : null));
           } catch (e) {
             Alert.alert('Error', (e as Error).message);

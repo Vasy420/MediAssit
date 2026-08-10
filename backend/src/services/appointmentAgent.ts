@@ -30,7 +30,6 @@ export async function bookAppointment(input: BookAppointmentInput) {
     doctor_id: input.doctor_id,
     date: av.date,
     time: input.time,
-    hospital: input.hospital ?? '',
     status: { $nin: ['cancelled', 'no_show'] },
   }).lean();
   if (existing) throw Errors.conflict('This time slot was just booked by someone else.');
@@ -42,6 +41,7 @@ export async function bookAppointment(input: BookAppointmentInput) {
     doctor_id: input.doctor_id,
     date: av.date,
     time: input.time,
+    hospital: input.hospital ?? '',
     reason: input.reason ?? '',
     urgency: input.urgency ?? 'green',
     status: 'scheduled',

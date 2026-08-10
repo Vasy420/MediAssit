@@ -17,6 +17,7 @@ export interface Doctor {
   doctor_id: string;
   specialty: string;
   department: string;
+  hospital?: string;
   experience_years: number;
   is_available: boolean;
   avg_rating?: number;
@@ -49,11 +50,13 @@ export interface MedicalReport {
   report_id: string;
   patient_id: string;
   doctor_id: string;
-  date: string;
-  symptoms?: string;
+  date?: string;
+  created_at?: string;
+  symptoms?: string | string[];
   clinical_observations?: string;
   doctor_diagnosis?: string;
   treatment?: string;
+  prescription?: string;
   follow_up?: string;
 }
 

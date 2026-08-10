@@ -35,7 +35,7 @@ export default function DoctorOnboardingScreen() {
         if (doctor?.experience !== undefined) setExperience(String(doctor.experience));
         if (doctor?.consultation_fee !== undefined) setConsultationFee(String(doctor.consultation_fee));
         if (doctor?.room_number) setRoomNumber(doctor.room_number);
-        if (doctor?.specialization && doctor.department && doctor.hospital) router.replace('/(tabs-doctor)');
+        if (doctor?.specialization && doctor.department && doctor.hospital) router.replace('/(tabs-doctor)/dashboard');
       } catch {
         // New doctor account has no doctor profile yet.
       } finally {
@@ -63,7 +63,7 @@ export default function DoctorOnboardingScreen() {
         room_number: roomNumber.trim(),
         status: 'available',
       });
-      router.replace('/(tabs-doctor)');
+      router.replace('/(tabs-doctor)/dashboard');
     } catch (e) {
       setError((e as Error).message);
     } finally {

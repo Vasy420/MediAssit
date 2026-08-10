@@ -33,12 +33,13 @@ export default function ReportDetailScreen() {
     <Screen padded={false}>
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Medical Report</Text>
-      <Text style={styles.date}>{new Date(report.date).toLocaleDateString('en-US', { dateStyle: 'long' })}</Text>
+      <Text style={styles.date}>{new Date(report.created_at ?? report.date ?? new Date().toISOString()).toLocaleDateString('en-US', { dateStyle: 'long' })}</Text>
 
-      <Field label="Symptoms" value={report.symptoms} />
+      <Field label="Symptoms" value={Array.isArray(report.symptoms) ? report.symptoms.join(', ') : report.symptoms} />
       <Field label="Clinical Observations" value={report.clinical_observations} />
       <Field label="Diagnosis" value={report.doctor_diagnosis} />
       <Field label="Treatment" value={report.treatment} />
+      <Field label="Prescription" value={report.prescription} />
       <Field label="Follow-up" value={report.follow_up} />
     </ScrollView>
     </Screen>

@@ -34,6 +34,19 @@ function RootStack() {
         <Stack.Screen name="patient-onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="doctor-onboarding" options={{ headerShown: false }} />
         <Stack.Screen
+          name="doctor/[id]"
+          options={{
+            headerShown: true,
+            title: 'Doctor Profile',
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+            headerStyle: { backgroundColor: theme.background },
+            headerTintColor: theme.ink,
+            headerTitleStyle: typography.heading,
+            headerShadowVisible: false,
+          }}
+        />
+        <Stack.Screen
           name="settings"
           options={{
             headerShown: false,

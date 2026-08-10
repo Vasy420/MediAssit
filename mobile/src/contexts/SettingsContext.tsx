@@ -1,12 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
-import { createFakeAppointments } from '../data/testData';
+import { createFakeAppointments, fakeDoctorQueue, fakeDoctorReports } from '../data/testData';
 import type { Appointment } from '../types';
 import { themes, type ThemeColors, type ThemeName } from '../ui/theme';
 
 const THEME_KEY = 'medassist_theme';
 const TEST_MODE_KEY = 'medassist_test_mode';
+
+type FakeQueueEntry = (typeof fakeDoctorQueue)[number];
+type FakeReport = (typeof fakeDoctorReports)[number];
+
+function createFakeQueue(): FakeQueueEntry[] {
+  return fakeDoctorQueue.map((entry) => ({
+    ...entry,
+    patient: entry.patient ? { ...entry.patient } : entry.patient,
+  }));
+}
+
+function createFakeReports(): FakeReport[] {
+  return fakeDoctorReports.map((report) => ({ ...report }));
+}
 
 interface SettingsState {
   themeName: ThemeName;
@@ -17,6 +31,10 @@ interface SettingsState {
   fakeAppointments: Appointment[];
   addFakeAppointment: (appointment: Appointment) => void;
   removeFakeAppointment: (appointmentId: string) => void;
+  fakeQueue: FakeQueueEntry[];
+  updateFakeQueueStatus: (queueId: string, status: string) => void;
+  fakeReports: FakeReport[];
+  addFakeReport: (report: FakeReport) => void;
 }
 
 const SettingsContext = createContext<SettingsState>({
@@ -28,6 +46,10 @@ const SettingsContext = createContext<SettingsState>({
   fakeAppointments: [],
   addFakeAppointment: () => {},
   removeFakeAppointment: () => {},
+  fakeQueue: [],
+  updateFakeQueueStatus: () => {},
+  fakeReports: [],
+  addFakeReport: () => {},
 });
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
@@ -35,6 +57,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [themeName, setThemeNameState] = useState<ThemeName>('ocean');
   const [testMode, setTestModeState] = useState(true);
   const [fakeAppointments, setFakeAppointments] = useState<Appointment[]>([]);
+  const [fakeQueue, setFakeQueue] = useState<FakeQueueEntry[]>(createFakeQueue);
+  const [fakeReports, setFakeReports] = useState<FakeReport[]>(createFakeReports);
 
   useEffect(() => {
     async function loadSettings() {
@@ -64,6 +88,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.setItem(TEST_MODE_KEY, String(enabled));
     if (enabled) {
       setFakeAppointments(createFakeAppointments(user?.user_id ?? 'FAKE-PATIENT'));
+      setFakeQueue(createFakeQueue());
+      setFakeReports(createFakeReports());
     } else {
       setFakeAppointments([]);
     }
@@ -77,6 +103,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setFakeAppointments((previous) => previous.filter((item) => item.appointment_id !== appointmentId));
   };
 
+  const updateFakeQueueStatus = (queueId: string, status: string) => {
+    setFakeQueue((previous) => previous.map((entry) => entry.queue_id === queueId ? { ...entry, status } : entry));
+  };
+
+  const addFakeReport = (report: FakeReport) => {
+    setFakeReports((previous) => [report, ...previous]);
+  };
+
   return (
     <SettingsContext.Provider value={{
       themeName,
@@ -87,6 +121,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       fakeAppointments,
       addFakeAppointment,
       removeFakeAppointment,
+      fakeQueue,
+      updateFakeQueueStatus,
+      fakeReports,
+      addFakeReport,
     }}>
       {children}
     </SettingsContext.Provider>

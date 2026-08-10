@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
 import type { Appointment } from '../../src/types';
 import { useSettings } from '../../src/contexts/SettingsContext';
@@ -38,7 +38,9 @@ export default function AppointmentsScreen() {
     }
   }, []);
 
-  useEffect(() => { loadAppointments(); }, [loadAppointments]);
+  useFocusEffect(useCallback(() => {
+    void loadAppointments();
+  }, [loadAppointments]));
 
   const handleCancel = async (appt: Appointment) => {
     if (appt.is_fake) {
@@ -67,7 +69,7 @@ export default function AppointmentsScreen() {
 
   const handleJoinQueue = async (appt: Appointment) => {
     if (appt.is_fake) {
-      Alert.alert('Fake test data', 'Queue API was not called for this fake appointment. Disable Test Mode to remove it.');
+      router.push('/queue/FAKE-QUEUE-001');
       return;
     }
     try {
@@ -101,6 +103,7 @@ export default function AppointmentsScreen() {
           </View>
           {appt.is_fake && <StatusBadge label="Fake test data" tone="warning" />}
           {appt.doctor_name && <Text style={styles.doctorName}>{appt.doctor_name}</Text>}
+          {appt.hospital && <Text style={styles.hospital}>Clinic: {appt.hospital}</Text>}
           {appt.reason && <Text style={styles.reason}>Reason: {appt.reason}</Text>}
           {appt.urgency && (
             <Text style={[styles.urgency, { color: appt.urgency === 'red' ? '#DC2626' : '#F59E0B' }]}>
@@ -109,7 +112,7 @@ export default function AppointmentsScreen() {
           )}
           {(appt.status === 'scheduled' || appt.status === 'confirmed') && (
             <View style={styles.actions}>
-              <Button title="Pre-Consult" variant="secondary" style={styles.actionButton} onPress={() => appt.is_fake ? Alert.alert('Fake test data', 'Pre-consultation API was not called for this fake appointment.') : router.push(`/preconsult/${appt.appointment_id}`)} />
+              <Button title="Pre-Consult" variant="secondary" style={styles.actionButton} onPress={() => router.push(`/preconsult/${appt.appointment_id}`)} />
               <Button title="Join Queue" variant="success" style={styles.actionButton} onPress={() => handleJoinQueue(appt)} />
               <Button title="Cancel" variant="danger" style={styles.actionButton} onPress={() => handleCancel(appt)} />
             </View>
@@ -134,6 +137,7 @@ const styles = StyleSheet.create({
   date: { ...typography.heading, color: colors.ink, flex: 1 },
   time: { ...typography.label, color: colors.primary, marginRight: spacing.sm },
   doctorName: { ...typography.body, color: colors.primary, marginTop: spacing.sm },
+  hospital: { ...typography.caption, color: colors.inkMuted, marginTop: spacing.xs },
   reason: { ...typography.body, color: colors.inkMuted, marginBottom: spacing.xs },
   urgency: { ...typography.caption, marginBottom: spacing.sm },
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },

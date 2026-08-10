@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
 import type { Appointment, Doctor } from '../../src/types';
 import { fakeDoctors } from '../../src/data/testData';
@@ -17,6 +18,7 @@ interface BackendDoctor {
   name?: string;
   specialization?: string;
   department?: string;
+  hospital?: string;
   experience?: number;
   experience_years?: number;
   rating?: number;
@@ -32,6 +34,7 @@ function normalizeDoctor(raw: BackendDoctor): Doctor {
     user: { user_id: raw.user_id || raw.doctor_id, role: 'doctor', name, email: '' },
     specialty: raw.specialization || 'General Physician',
     department: raw.department || 'General Care',
+    hospital: raw.hospital || '',
     experience_years: raw.experience_years ?? raw.experience ?? 0,
     is_available: raw.is_available ?? (raw.status === 'available' || raw.status === undefined),
     avg_rating: raw.avg_rating ?? raw.rating,
@@ -43,6 +46,7 @@ function todayIso() {
 }
 
 export default function DoctorsScreen() {
+  const router = useRouter();
   const { testMode, addFakeAppointment, theme } = useSettings();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +58,7 @@ export default function DoctorsScreen() {
   const [reason, setReason] = useState('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [bookingError, setBookingError] = useState('');
 
   const visibleDoctors = testMode
     ? [...fakeDoctors, ...doctors.filter((doctor) => !doctor.doctor_id.startsWith('FAKE-'))]
@@ -84,11 +89,11 @@ export default function DoctorsScreen() {
     }
     try {
       const res = await api.get<{ slots?: string[] }>(`/api/doctors/${doctor.doctor_id}/availability?date=${encodeURIComponent(date)}`);
-      const data = res.data as unknown as { slots?: string[] };
-      setAvailableSlots(data?.slots ?? []);
+      const data = res.data as unknown as { slots?: string[]; data?: { slots?: string[] } };
+      setAvailableSlots(data?.slots ?? data?.data?.slots ?? []);
     } catch (error) {
       setAvailableSlots([]);
-      Alert.alert('Availability unavailable', (error as Error).message);
+      setBookingError((error as Error).message || 'Could not load available times.');
     } finally {
       setLoadingSlots(false);
     }
@@ -98,8 +103,9 @@ export default function DoctorsScreen() {
     const date = todayIso();
     setSelectedDoctor(doctor);
     setBookingDate(date);
-    setHospital('');
+    setHospital(doctor.hospital || '');
     setReason('General consultation');
+    setBookingError('');
     void loadSlots(doctor, date);
   };
 
@@ -108,16 +114,17 @@ export default function DoctorsScreen() {
   };
 
   const handleConfirmBooking = async () => {
-    if (!selectedDoctor || !bookingTime || !hospital.trim() || !reason.trim()) {
-      Alert.alert('Complete appointment details', 'Choose a date, time, hospital, and reason before continuing.');
+    if (!selectedDoctor || !bookingTime || !reason.trim()) {
+      setBookingError('Choose a date and available time, then enter reason for visit. Clinic is optional.');
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) {
-      Alert.alert('Invalid date', 'Use date format YYYY-MM-DD.');
+      setBookingError('Use date format YYYY-MM-DD.');
       return;
     }
 
     setBookingDoctor(selectedDoctor.doctor_id);
+    setBookingError('');
     const isFake = selectedDoctor.doctor_id.startsWith('FAKE-');
     try {
       if (isFake) {
@@ -128,7 +135,7 @@ export default function DoctorsScreen() {
           doctor_name: selectedDoctor.user.name,
           date: bookingDate,
           time: bookingTime,
-          hospital: hospital.trim(),
+          hospital: hospital.trim() || undefined,
           status: 'confirmed',
           reason: reason.trim(),
           urgency: 'green',
@@ -164,7 +171,7 @@ export default function DoctorsScreen() {
         contentContainerStyle={styles.container}
         renderItem={({ item: doctor }) => (
           <Card style={styles.card}>
-            <View style={styles.cardHeader}>
+            <Pressable accessibilityRole="button" onPress={() => router.push(`/doctor/${doctor.doctor_id}`)} style={({ pressed }) => [styles.cardHeader, pressed && styles.pressed]}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{doctor.user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}</Text>
               </View>
@@ -172,8 +179,9 @@ export default function DoctorsScreen() {
                 <Text style={styles.name}>{doctor.user.name}</Text>
                 <Text style={styles.specialty}>{doctor.specialty}</Text>
                 <Text style={styles.dept}>{doctor.department}</Text>
+                {doctor.hospital ? <Text style={styles.hospital}>{doctor.hospital}</Text> : null}
               </View>
-            </View>
+            </Pressable>
             <View style={styles.meta}>
               <Text style={styles.metaText}>{doctor.experience_years} yrs exp</Text>
               {doctor.avg_rating && <Text style={styles.metaText}>★ {doctor.avg_rating.toFixed(1)}</Text>}
@@ -206,7 +214,7 @@ export default function DoctorsScreen() {
                 </Pressable>
               </View>
 
-              <TextField label="Date" value={bookingDate} onChangeText={setBookingDate} placeholder="YYYY-MM-DD" autoCapitalize="none" containerStyle={styles.modalField} />
+              <TextField label="Date" value={bookingDate} onChangeText={(value) => { setBookingDate(value); setBookingTime(null); setBookingError(''); }} placeholder="YYYY-MM-DD" autoCapitalize="none" containerStyle={styles.modalField} />
               <Button title="Check available times" variant="secondary" onPress={() => selectedDoctor && loadSlots(selectedDoctor, bookingDate)} loading={loadingSlots} />
 
               <Text style={[styles.fieldLabel, { color: theme.inkMuted }]}>Choose a time</Text>
@@ -219,8 +227,16 @@ export default function DoctorsScreen() {
                 ))}
               </View>
 
-              <TextField label="Hospital or clinic" placeholder="Where should we schedule it?" value={hospital} onChangeText={setHospital} containerStyle={styles.modalField} />
-              <TextField label="Reason for visit" placeholder="What do you need help with?" value={reason} onChangeText={setReason} multiline containerStyle={styles.modalField} />
+              {selectedDoctor?.hospital ? (
+                <Pressable onPress={() => setHospital(selectedDoctor.hospital || '')} style={({ pressed }) => [styles.hospitalPreset, { backgroundColor: theme.primarySoft, borderColor: theme.border }, pressed && styles.pressed]}>
+                  <Text style={[styles.presetLabel, { color: theme.inkMuted }]}>Existing clinic</Text>
+                  <Text style={[styles.presetValue, { color: theme.primaryDark }]}>{selectedDoctor.hospital}</Text>
+                  <Text style={[styles.presetAction, { color: theme.primary }]}>Use this clinic</Text>
+                </Pressable>
+              ) : null}
+              <TextField label="Hospital or clinic (optional)" placeholder="Where should we schedule it?" value={hospital} onChangeText={(value) => { setHospital(value); setBookingError(''); }} containerStyle={styles.modalField} />
+              <TextField label="Reason for visit" placeholder="What do you need help with?" value={reason} onChangeText={(value) => { setReason(value); setBookingError(''); }} multiline containerStyle={styles.modalField} />
+              {bookingError ? <Text style={[styles.bookingError, { color: theme.danger }]}>{bookingError}</Text> : null}
               <Button title={selectedDoctor?.doctor_id.startsWith('FAKE-') ? 'Add fake appointment' : 'Confirm appointment'} onPress={handleConfirmBooking} loading={bookingDoctor !== null} disabled={bookingDoctor !== null} />
               <Button title="Cancel" variant="ghost" onPress={closeBooking} disabled={bookingDoctor !== null} />
             </ScrollView>
@@ -240,6 +256,7 @@ const styles = StyleSheet.create({
   name: { ...typography.heading, color: colors.ink },
   specialty: { ...typography.body, color: colors.primary },
   dept: { ...typography.caption, color: colors.inkMuted, marginTop: 2 },
+  hospital: { ...typography.caption, color: colors.inkMuted, marginTop: spacing.xs },
   meta: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md, alignItems: 'center' },
   metaText: { ...typography.caption, color: colors.inkMuted },
   bookBtn: { width: '100%', marginTop: spacing.md },
@@ -253,9 +270,14 @@ const styles = StyleSheet.create({
   closeButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
   closeText: { fontSize: 18, fontWeight: '700' },
   modalField: { marginTop: spacing.xs },
+  bookingError: { ...typography.caption, marginTop: -spacing.xs },
   fieldLabel: { ...typography.label, marginTop: spacing.sm },
   noSlots: { ...typography.caption },
   slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   slot: { minHeight: 44, minWidth: 100, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center' },
+  hospitalPreset: { borderWidth: 1, borderRadius: radii.md, padding: spacing.md, gap: spacing.xs },
+  presetLabel: { ...typography.caption },
+  presetValue: { ...typography.label, fontSize: 15 },
+  presetAction: { ...typography.caption, fontWeight: '700' },
   pressed: { opacity: 0.62, transform: [{ scale: 0.97 }] },
 });

@@ -5,6 +5,9 @@ import { Errors } from '../utils/ApiError.js';
 import { addDaysIso, toDisplayTime, todayIso, weekdayName } from '../utils/time.js';
 import { nextId } from '../utils/idGen.js';
 
+const DEFAULT_SLOTS = ['09:00 AM', '10:30 AM', '12:00 PM', '02:00 PM', '03:30 PM', '05:00 PM'];
+const DEFAULT_WEEKEND_SLOTS = ['10:00 AM', '11:30 AM', '01:00 PM'];
+
 export async function getDoctorForUser(userId: string) {
   const doctor = await Doctor.findOne({ user_id: userId }).lean();
   if (!doctor) throw Errors.notFound('Doctor record not found');
@@ -66,7 +69,13 @@ export async function getAvailability(doctorId: string, requestedDate?: string) 
       : addDaysIso(0);
   const dayName = weekdayName(date);
   const row = doctor.availability?.find((a) => a.day === dayName);
-  const rawSlots = row?.slots ?? [];
+  const rawSlots = row?.slots?.length
+    ? row.slots
+    : dayName === 'Sunday'
+      ? []
+      : dayName === 'Saturday'
+        ? DEFAULT_WEEKEND_SLOTS
+        : DEFAULT_SLOTS;
 
   const booked = await Appointment.find({
     doctor_id: doctorId,

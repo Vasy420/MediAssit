@@ -116,7 +116,7 @@ export default function SettingsScreen() {
         <View style={[styles.testCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.testCopy}>
             <Text style={[styles.optionLabel, { color: theme.ink }]}>Test mode</Text>
-            <Text style={[styles.optionDescription, { color: theme.inkMuted }]}>Show clearly labeled fake doctors and appointments for UI testing.</Text>
+            <Text style={[styles.optionDescription, { color: theme.inkMuted }]}>Show clearly labeled fake doctors, appointments, queue entries, patients, and reports for UI testing.</Text>
             <Text style={[styles.warning, { color: theme.warning }]}>No fake data is sent to backend.</Text>
           </View>
           <Switch

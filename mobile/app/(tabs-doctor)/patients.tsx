@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
+import { fakePatientSummary } from '../../src/data/testData';
+import { useSettings } from '../../src/contexts/SettingsContext';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
 import { Screen } from '../../src/ui/Screen';
@@ -23,11 +25,12 @@ interface PatientSummary {
   preconsult_summary?: Record<string, unknown> | null;
   triage_result?: Record<string, unknown> | null;
   urgency?: string;
-  recent_reports?: { report_id: string; diagnosis: string; date: string }[];
+  recent_reports?: { report_id: string; diagnosis: string; date: string; is_fake?: boolean }[];
 }
 
 export default function PatientsScreen() {
   const router = useRouter();
+  const { testMode } = useSettings();
   const [patientId, setPatientId] = useState('');
   const [patient, setPatient] = useState<PatientSummary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,6 +40,11 @@ export default function PatientsScreen() {
     if (!patientId.trim()) return;
     setLoading(true);
     setSearched(true);
+    if (testMode && patientId.trim().toUpperCase().startsWith('FAKE')) {
+      setPatient(fakePatientSummary as PatientSummary);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await api.get<PatientSummary>(`/api/doctor-dashboard/patient-summary/${patientId.trim()}`);
       setPatient(res.data as unknown as PatientSummary);
@@ -60,6 +68,7 @@ export default function PatientsScreen() {
         />
         <Button title="Search" style={styles.searchBtn} onPress={searchPatient} disabled={loading} loading={loading} />
       </View>
+      {testMode && <Text style={styles.testHint}>Test mode: search `FAKE-P001` to view demo patient data.</Text>}
 
       {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: spacing.xl }} />}
 
@@ -69,6 +78,7 @@ export default function PatientsScreen() {
 
       {patient && (
         <Card style={styles.resultCard}>
+          {patient.patient.patient_id.startsWith('FAKE-') && <StatusBadge label="Fake test data" tone="warning" />}
           <Text style={styles.sectionTitle}>Patient Profile</Text>
           <Text style={styles.field}>Name: {patient.patient.name}</Text>
           <Text style={styles.field}>Age: {patient.patient.age ?? 'N/A'}</Text>
@@ -111,7 +121,7 @@ export default function PatientsScreen() {
                 <Pressable
                   key={r.report_id}
                   style={({ pressed }) => [styles.reportItem, pressed && styles.pressed]}
-                  onPress={() => router.push(`/reports/${r.report_id}`)}
+                  onPress={() => r.is_fake ? Alert.alert('Fake test data', 'This report is local demo data.') : router.push(`/reports/${r.report_id}`)}
                 >
                   <Text style={styles.field}>{r.diagnosis}</Text>
                   <Text style={styles.reportDate}>{new Date(r.date).toLocaleDateString()}</Text>
@@ -132,6 +142,7 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg, alignItems: 'flex-end' },
   searchInput: { flex: 1 },
   searchBtn: { minWidth: 92 },
+  testHint: { ...typography.caption, color: colors.warning, marginBottom: spacing.md },
   emptyText: { ...typography.body, color: colors.inkSubtle, textAlign: 'center', marginTop: spacing.xl },
   resultCard: { padding: spacing.lg },
   sectionTitle: { ...typography.heading, color: colors.ink, marginBottom: spacing.sm },
