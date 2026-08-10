@@ -114,3 +114,60 @@ export async function aiSummarizeReport(report: {
     return extractiveSummary(report.report_text);
   }
 }
+
+export interface PreConsultPayload {
+  patient_id?: string;
+  appointment_id?: string;
+  triage_context?: Record<string, unknown>;
+  patient_context?: { age?: number | null; gender?: string | null; existing_conditions?: string[] };
+  messages: { role: string; text: string }[];
+  answers: { key: string; answer: string; rephrased?: boolean }[];
+}
+
+export interface PreConsultTurn {
+  type: 'question' | 'result';
+  question?: {
+    id: string;
+    key: string;
+    text: string;
+    rephrased: boolean;
+    options: { id: string; key: string; text: string; emoji: string }[];
+  };
+  preconsult_summary?: Record<string, unknown>;
+  done: boolean;
+}
+
+export async function aiPreConsult(payload: PreConsultPayload): Promise<PreConsultTurn> {
+  try {
+    const data = (await post('/ai/preconsult', payload)) as PreConsultTurn;
+    return data;
+  } catch (err) {
+    logger.warn('AI preconsult unavailable: ' + (err as Error).message);
+    throw err;
+  }
+}
+
+export interface SlotRecommendPayload {
+  urgency: string;
+  recommended_specialties: { name: string; score: number }[];
+  available_slots: {
+    doctor_id: string;
+    doctor_name: string;
+    specialization: string;
+    date: string;
+    time: string;
+    consultation_fee: number;
+    rating: number;
+    estimated_wait_minutes: number;
+  }[];
+}
+
+export async function aiRecommendSlots(payload: SlotRecommendPayload): Promise<{ recommendations: Record<string, unknown>[] }> {
+  try {
+    const data = (await post('/ai/recommend-slots', payload)) as { recommendations: Record<string, unknown>[] };
+    return data;
+  } catch (err) {
+    logger.warn('AI slot recommendation unavailable: ' + (err as Error).message);
+    throw err;
+  }
+}

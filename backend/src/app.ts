@@ -11,6 +11,9 @@ import { appointmentRouter } from './routes/appointments.js';
 import { queueRouter } from './routes/queue.js';
 import { reportRouter } from './routes/reports.js';
 import { patientRouter } from './routes/patients.js';
+import { preconsultRouter } from './routes/preconsult.js';
+import { doctorDashboardRouter } from './routes/doctorDashboard.js';
+import { slotRouter } from './routes/slotRecommendation.js';
 
 export function createApp(): Express {
   const app = express();
@@ -45,6 +48,9 @@ export function createApp(): Express {
   app.use('/api/queue', queueRouter);
   app.use('/api/reports', reportRouter);
   app.use('/api/patients', patientRouter);
+  app.use('/api/preconsult', preconsultRouter);
+  app.use('/api/doctor-dashboard', doctorDashboardRouter);
+  app.use('/api/slots', slotRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -3,6 +3,12 @@ import { Appointment } from '../models/Appointment.js';
 import { Errors } from '../utils/ApiError.js';
 import { addDaysIso, toDisplayTime, todayIso, weekdayName } from '../utils/time.js';
 
+export async function getDoctorForUser(userId: string) {
+  const doctor = await Doctor.findOne({ user_id: userId }).lean();
+  if (!doctor) throw Errors.notFound('Doctor record not found');
+  return doctor;
+}
+
 export async function listDoctors(specialty?: string) {
   const query = specialty ? { specialization: specialty } : {};
   return Doctor.find(query).select('-__v').sort({ rating: -1 }).lean();

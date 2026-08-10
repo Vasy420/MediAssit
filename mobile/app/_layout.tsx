@@ -9,6 +9,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(tabs-doctor)" />
         <Stack.Screen
           name="reports/[id]"
           options={{ headerShown: true, title: 'Report', presentation: 'modal' }}
@@ -16,6 +17,10 @@ export default function RootLayout() {
         <Stack.Screen
           name="queue/[id]"
           options={{ headerShown: true, title: 'Queue', presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="preconsult/[appointmentId]"
+          options={{ headerShown: true, title: 'Pre-Consultation', presentation: 'modal' }}
         />
       </Stack>
     </AuthProvider>

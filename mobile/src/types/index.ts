@@ -83,6 +83,39 @@ export interface TriageResult {
 
 export type ChatTurn = TriageQuestion | TriageResult;
 
+export interface PreConsultSummary {
+  pc_id: string;
+  appointment_id: string;
+  chief_complaint: string;
+  symptoms: { duration: string; severity: string }[];
+  medications: string[];
+  allergies: string[];
+  medical_history: string;
+  lifestyle_notes: string;
+  vital_signs: Record<string, string>;
+  triage_context: Record<string, unknown>;
+  status: 'in_progress' | 'completed';
+}
+
+export interface DoctorDashboardData {
+  doctor_id: string;
+  doctor_name: string;
+  specialization: string;
+  today_appointments: {
+    appointment_id: string;
+    patient_id: string;
+    patient_name: string;
+    time: string;
+    urgency: string;
+    status: string;
+    queue_position: string | null;
+    queue_status: string | null;
+  }[];
+  total_today: number;
+  queue_length: number;
+  urgency_breakdown: { red: number; orange: number; yellow: number; green: number };
+}
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;

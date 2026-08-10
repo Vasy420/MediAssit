@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
+import { startScheduler, stopScheduler } from './services/schedulerService.js';
 
 async function main() {
   await connectDatabase();
@@ -10,8 +11,11 @@ async function main() {
     logger.info('MedAssist+ API listening on port ' + env.port + ' (' + env.nodeEnv + ')');
   });
 
+  startScheduler(30);
+
   const shutdown = async (signal: string) => {
     logger.info('Received ' + signal + ' - shutting down gracefully');
+    stopScheduler();
     server.close(async () => {
       await disconnectDatabase();
       process.exit(0);

@@ -8,7 +8,13 @@ import {
 } from '../services/queueAgent.js';
 import { Errors } from '../utils/ApiError.js';
 import { getPatientForUser } from '../services/patientService.js';
+import { Patient } from '../models/Patient.js';
 import { notify } from '../services/notificationService.js';
+
+async function getUserIdFromPatientId(patientId: string): Promise<string | undefined> {
+  const patient = await Patient.findOne({ patient_id: patientId }).select('user_id').lean();
+  return patient?.user_id;
+}
 
 export async function handleActiveQueue(req: Request, res: Response) {
   if (req.user!.role !== 'patient') throw Errors.badRequest('Only patients have active queue entries');
@@ -48,7 +54,19 @@ export async function handlePatientQueue(req: Request, res: Response) {
 export async function handleUpdateQueue(req: Request, res: Response) {
   const queue = await updateQueueStatus(String(req.params.id), (req.body.status as string) ?? '');
   if (req.body.status === 'called') {
-    void notify.doctorCalling(queue.patient_id, queue.queue_id);
+    const userId = await getUserIdFromPatientId(queue.patient_id || '');
+    if (userId) void notify.doctorCalling(userId, queue.queue_id);
+  }
+  if (queue.position !== undefined && queue.position > 0) {
+    const userId = await getUserIdFromPatientId(queue.patient_id || '');
+    if (userId) {
+      void notify.queueUpdate(
+        userId,
+        queue.queue_id || '',
+        queue.position,
+        queue.waiting_time || 0,
+      );
+    }
   }
   res.json({ success: true, data: queue });
 }

@@ -34,3 +34,18 @@ class ChatRequest(BaseModel):
 class SummaryRequest(BaseModel):
     text: str
     diagnosis: str = ''
+
+
+class PreConsultRequest(BaseModel):
+    patient_id: Optional[str] = None
+    appointment_id: Optional[str] = None
+    triage_context: Optional[dict] = None
+    patient_context: Optional[PatientContext] = None
+    messages: list[Message] = Field(default_factory=list)
+    answers: list[Answer] = Field(default_factory=list)
+
+
+class SlotRecommendRequest(BaseModel):
+    urgency: str = 'green'
+    recommended_specialties: list[dict] = Field(default_factory=list)
+    available_slots: list[dict] = Field(default_factory=list)

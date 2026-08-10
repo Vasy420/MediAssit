@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "mongodb-memory-server": "^11.2.0",
-    "tsx": "^4.23.11"
+    "tsx": "^4.23.11",
+    "typescript": "^7.0.2"
   }
 }

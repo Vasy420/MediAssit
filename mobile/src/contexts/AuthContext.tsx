@@ -53,20 +53,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token && !inAuthGroup) {
       router.replace('/(auth)/login');
     }
-  }, [token, loading, segments, router]);
+  }, [token, loading, segments, router, user]);
 
   const login = async (t: string, u: User) => {
     await Promise.all([api.setToken(t), api.setStoredUser(JSON.stringify(u))]);
     setToken(t);
     setUser(u);
-    router.replace('/(tabs)');
+    router.replace(u.role === 'doctor' ? '/(tabs-doctor)' : '/(tabs)');
   };
 
   const registerUser = async (t: string, u: User) => {
     await Promise.all([api.setToken(t), api.setStoredUser(JSON.stringify(u))]);
     setToken(t);
     setUser(u);
-    router.replace('/(tabs)');
+    router.replace(u.role === 'doctor' ? '/(tabs-doctor)' : '/(tabs)');
   };
 
   const logout = async () => {

@@ -90,6 +90,9 @@ export default function AppointmentsScreen() {
           )}
           {appt.status === 'confirmed' && (
             <View style={styles.actions}>
+              <TouchableOpacity style={styles.preconsultBtn} onPress={() => router.push(`/preconsult/${appt.appointment_id}`)}>
+                <Text style={styles.preconsultBtnText}>Pre-Consult</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.joinBtn} onPress={() => handleJoinQueue(appt)}>
                 <Text style={styles.joinBtnText}>Join Queue</Text>
               </TouchableOpacity>
@@ -122,7 +125,9 @@ const styles = StyleSheet.create({
   statusText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
   reason: { fontSize: 14, color: '#475569', marginBottom: 4 },
   urgency: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  actions: { flexDirection: 'row', gap: 10, marginTop: 6, flexWrap: 'wrap' },
+  preconsultBtn: { backgroundColor: '#3B82F6', borderRadius: 8, padding: 10, alignItems: 'center', minWidth: 90 },
+  preconsultBtnText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
   joinBtn: { flex: 1, backgroundColor: '#16A34A', borderRadius: 8, padding: 10, alignItems: 'center' },
   joinBtnText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
   cancelBtn: { flex: 1, backgroundColor: '#FEE2E2', borderRadius: 8, padding: 10, alignItems: 'center' },
