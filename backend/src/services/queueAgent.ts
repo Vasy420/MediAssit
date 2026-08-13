@@ -6,6 +6,7 @@ import { Errors } from '../utils/ApiError.js';
 import { nextId } from '../utils/idGen.js';
 import { logger } from '../utils/logger.js';
 import { notify } from './notificationService.js';
+import { guidanceFor } from './urgencyGuidance.js';
 import type { QueueType } from '../models/Queue.js';
 import type { AppointmentType } from '../models/Appointment.js';
 import type { PatientType } from '../models/Patient.js';
@@ -103,6 +104,9 @@ export async function findQueue(queueId: string): Promise<QueueView> {
     ...toQueueView(queue as unknown as QueueType, (appt as unknown as AppointmentType) ?? null),
     position: current?.position,
     waiting_time: current?.waiting_time ?? queue.waiting_time,
+    estimated_wait_minutes: current?.waiting_time ?? queue.waiting_time,
+    urgency: queue.urgency,
+    priority_guidance: guidanceFor(queue.urgency),
     appointment_time: appt?.time,
     appointment_date: appt?.date,
   };
@@ -131,7 +135,9 @@ export async function listDoctorQueue(doctorId: string): Promise<QueueView[]> {
       ...(row as unknown as QueueType),
       position: i + 1,
       waiting_time: i * AVG_CONSULT_MINUTES,
+      estimated_wait_minutes: i * AVG_CONSULT_MINUTES,
       patient: p ?? null,
+      priority_guidance: guidanceFor(row.urgency),
       appointment_time: appt?.time,
       appointment_date: appt?.date,
     };
@@ -156,6 +162,8 @@ export async function listPatientQueue(patientId: string): Promise<QueueView | n
     ...(row as unknown as QueueType),
     position: index >= 0 ? index + 1 : 1,
     waiting_time: index >= 0 ? index * AVG_CONSULT_MINUTES : 0,
+    estimated_wait_minutes: index >= 0 ? index * AVG_CONSULT_MINUTES : 0,
+    priority_guidance: guidanceFor(row.urgency),
     doctor,
   };
 }

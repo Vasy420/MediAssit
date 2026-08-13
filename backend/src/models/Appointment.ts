@@ -15,6 +15,7 @@ const appointmentSchema = new Schema({
     default: 'scheduled',
   },
   reminder_sent_at: { type: Date },
+  ai_assist: { type: Schema.Types.Mixed, default: null },
   created_at: { type: Date, default: Date.now },
 });
 

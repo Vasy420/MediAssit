@@ -13,6 +13,7 @@ class SlotInfo:
     time: str
     consultation_fee: float = 0
     rating: float = 0
+    experience_years: int = 0
     estimated_wait_minutes: int = 0
 
 

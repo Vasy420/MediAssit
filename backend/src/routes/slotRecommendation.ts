@@ -35,6 +35,7 @@ slotRouter.post('/recommend', async (req: Request, res: Response) => {
     time: string;
     consultation_fee: number;
     rating: number;
+    experience_years: number;
     estimated_wait_minutes: number;
   }[] = [];
 
@@ -57,6 +58,7 @@ slotRouter.post('/recommend', async (req: Request, res: Response) => {
             time,
             consultation_fee: doctor.consultation_fee,
             rating: doctor.rating,
+            experience_years: doctor.experience ?? 0,
             estimated_wait_minutes: waitMinutes,
           });
         }
@@ -78,7 +80,11 @@ slotRouter.post('/recommend', async (req: Request, res: Response) => {
     });
   } catch {
     const fallback = [...slots]
-      .sort((a, b) => a.estimated_wait_minutes - b.estimated_wait_minutes || a.date.localeCompare(b.date))
+      .sort((a, b) =>
+        (b.rating * 10 + (b.experience_years ?? 0) * 2 - b.estimated_wait_minutes) -
+        (a.rating * 10 + (a.experience_years ?? 0) * 2 - a.estimated_wait_minutes)
+        || a.date.localeCompare(b.date),
+      )
       .slice(0, 5);
     res.json({
       success: true,

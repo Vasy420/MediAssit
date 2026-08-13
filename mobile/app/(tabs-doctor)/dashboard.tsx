@@ -29,6 +29,7 @@ interface DashboardData {
     queue_status: string | null;
     preconsult_status?: string | null;
     chief_complaint?: string;
+    urgency_guidance?: { level: string; label: string; action: string };
   }[];
   total_today: number;
   queue_length: number;
@@ -111,7 +112,10 @@ export default function DoctorDashboardScreen() {
 
           <FadeSlide delay={160}>
           <Card style={styles.urgencyRow}>
-            <Text style={[styles.sectionTitle, { color: theme.ink }]}>Urgency Breakdown</Text>
+            <Text style={[styles.sectionTitle, { color: theme.ink }]}>AI urgency guidance</Text>
+            <Text style={[styles.emptyText, { textAlign: 'left', marginTop: 0, marginBottom: spacing.sm }]}>
+              Queue order follows pre-consultation severity: red first, then orange, yellow, and routine green visits.
+            </Text>
             <View style={styles.urgencyBar}>
               {(['red', 'orange', 'yellow', 'green'] as const).map((level) => (
                 <View key={level} style={styles.urgencyItem}>
@@ -145,6 +149,7 @@ export default function DoctorDashboardScreen() {
                 <Text style={[styles.apptDate, { color: theme.inkMuted }]}>Date: {new Date(`${appt.date}T00:00:00`).toLocaleDateString()}</Text>
                 <Text style={[styles.apptStatus, { color: theme.inkMuted }]}>Status: {appt.status.replace(/_/g, ' ')}</Text>
                 {appt.chief_complaint ? <Text style={[styles.apptStatus, { color: theme.inkMuted }]}>Complaint: {appt.chief_complaint}</Text> : null}
+                {appt.urgency_guidance?.action ? <Text style={[styles.apptQueue, { color: theme.primary }]}>{appt.urgency_guidance.action}</Text> : null}
                 {appt.preconsult_status ? <Text style={[styles.apptQueue, { color: theme.primary }]}>Pre-consult: {appt.preconsult_status.replace(/_/g, ' ')}</Text> : null}
                 {appt.queue_position && (
                   <Text style={[styles.apptQueue, { color: theme.primary }]}>Queue: {appt.queue_position} ({appt.queue_status})</Text>

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .config import settings
-from .routes import ai, health, preconsult, slots, summarize
+from .routes import ai, diagnose, health, preconsult, slots, summarize
 
 
 @asynccontextmanager
@@ -48,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(summarize.router)
     app.include_router(preconsult.router)
     app.include_router(slots.router)
+    app.include_router(diagnose.router)
 
     @app.get('/')
     def root() -> dict:

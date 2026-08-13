@@ -59,11 +59,19 @@ def test_report_parser_extracts_sections():
 
 def test_slot_recommendation_prefers_shorter_wait():
     recs = recommend_slots([
-        {'doctor_id': 'D2', 'doctor_name': 'Slow', 'specialization': 'GP', 'date': '2026-08-14', 'time': '09:00 AM', 'estimated_wait_minutes': 45},
-        {'doctor_id': 'D1', 'doctor_name': 'Fast', 'specialization': 'GP', 'date': '2026-08-14', 'time': '09:30 AM', 'estimated_wait_minutes': 5},
+        {'doctor_id': 'D2', 'doctor_name': 'Slow', 'specialization': 'GP', 'date': '2026-08-14', 'time': '09:00 AM', 'estimated_wait_minutes': 45, 'rating': 4.2, 'experience_years': 8},
+        {'doctor_id': 'D1', 'doctor_name': 'Fast', 'specialization': 'GP', 'date': '2026-08-14', 'time': '09:30 AM', 'estimated_wait_minutes': 5, 'rating': 4.2, 'experience_years': 8},
     ], urgency='green')
     assert recs[0]['doctor_id'] == 'D1'
     assert recs[0]['estimated_wait_minutes'] == 5
+
+
+def test_slot_recommendation_prefers_experience_and_rating_when_wait_is_similar():
+    recs = recommend_slots([
+        {'doctor_id': 'D2', 'doctor_name': 'Junior', 'specialization': 'GP', 'date': '2026-08-14', 'time': '09:00 AM', 'estimated_wait_minutes': 10, 'rating': 3.8, 'experience_years': 2},
+        {'doctor_id': 'D1', 'doctor_name': 'Senior', 'specialization': 'GP', 'date': '2026-08-14', 'time': '09:30 AM', 'estimated_wait_minutes': 12, 'rating': 4.9, 'experience_years': 18},
+    ], urgency='green')
+    assert recs[0]['doctor_id'] == 'D1'
 
 
 def test_slot_recommendation_urgent_prefers_earlier_slot():

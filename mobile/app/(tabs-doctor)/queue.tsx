@@ -23,6 +23,7 @@ interface QueueEntry {
   status: string;
   waiting_time: number;
   is_fake?: boolean;
+  priority_guidance?: { label: string; action: string };
 }
 
 export default function DoctorQueueScreen() {
@@ -152,6 +153,7 @@ export default function DoctorQueueScreen() {
               <Text style={styles.detail}>Token: {entry.queue_token || entry.queue_id}</Text>
               <Text style={styles.detail}>Position: #{entry.position}</Text>
               <Text style={[styles.detail, { color: severityColor(entry.urgency) }]}>Urgency: {entry.urgency.toUpperCase()}</Text>
+              {entry.priority_guidance?.action ? <Text style={styles.detail}>{entry.priority_guidance.action}</Text> : null}
               {entry.appointment_time && <Text style={styles.detail}>Appointment: {entry.appointment_time}</Text>}
               <View style={styles.actionRow}>
                 {entry.status === 'called' && (
@@ -180,6 +182,7 @@ export default function DoctorQueueScreen() {
               <Text style={styles.detail}>Token: {entry.queue_token || entry.queue_id}</Text>
               <Text style={styles.detail}>Position: #{entry.position}</Text>
               <Text style={styles.detail}>Est. wait: ~{entry.waiting_time} min</Text>
+              {entry.priority_guidance?.action ? <Text style={styles.detail}>{entry.priority_guidance.action}</Text> : null}
               {entry.appointment_time && <Text style={styles.detail}>Appointment: {entry.appointment_time}</Text>}
             </Card>
             </Stagger>

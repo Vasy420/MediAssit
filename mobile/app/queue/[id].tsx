@@ -21,7 +21,7 @@ export default function QueueScreen() {
 
   async function loadEntry() {
     if (isFake) {
-      setEntry({ queue_id: id, queue_token: 'Q-FAKE', patient_id: 'FAKE-PATIENT', doctor_id: 'FAKE-DOC-001', position: 3, status: 'waiting', estimated_wait_minutes: 30 });
+      setEntry({ queue_id: id, queue_token: 'Q-FAKE', patient_id: 'FAKE-PATIENT', doctor_id: 'FAKE-DOC-001', position: 3, status: 'waiting', estimated_wait_minutes: 30, urgency: 'yellow', priority_guidance: { level: 'yellow', label: 'Soon', action: 'Keep ahead of routine visits. Moderate severity from the AI interview.' } });
       return;
     }
     try {
@@ -103,8 +103,13 @@ export default function QueueScreen() {
             <Text style={[styles.appointmentText, { color: theme.primaryDark }]}>Appointment {entry.appointment_time ?? entry.appointment?.time}</Text>
           </View>
         )}
+        {entry.priority_guidance?.action ? (
+          <Text style={[styles.hint, { color: theme.inkMuted }]}>
+            Priority: {entry.priority_guidance.label}. {entry.priority_guidance.action}
+          </Text>
+        ) : null}
         {entry.status === 'waiting' && (
-          <Text style={[styles.hint, { color: theme.inkSubtle }]}>You will be notified when the doctor calls you.</Text>
+          <Text style={[styles.hint, { color: theme.inkSubtle }]}>You will be notified when the doctor calls you. Position and wait time update live.</Text>
         )}
       </Card>
       </ScaleIn>

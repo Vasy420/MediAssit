@@ -10,6 +10,8 @@ import { Conversation } from '../models/Conversation.js';
 import { getDoctorForUser } from '../services/doctorService.js';
 import { nextId } from '../utils/idGen.js';
 import { Errors } from '../utils/ApiError.js';
+import { allUrgencyGuidance, guidanceFor } from '../services/urgencyGuidance.js';
+import { aiDiagnose } from '../services/aiClient.js';
 
 export async function handleDoctorDashboard(req: Request, res: Response) {
   const doctor = await getDoctorForUser(req.user!.user_id);
@@ -64,6 +66,7 @@ export async function handleDoctorDashboard(req: Request, res: Response) {
       queue_status: queue?.status ?? null,
       preconsult_status: preconsult?.status ?? null,
       chief_complaint: preconsult?.chief_complaint || a.reason || '',
+      urgency_guidance: guidanceFor(a.urgency),
     };
   });
 
@@ -77,6 +80,7 @@ export async function handleDoctorDashboard(req: Request, res: Response) {
       total_today: appointments.length,
       queue_length: queueEntries.length,
       urgency_breakdown: urgencyBreakdown,
+      urgency_guidance: allUrgencyGuidance(),
     },
   });
 }
@@ -252,6 +256,8 @@ export async function handleConsultation(req: Request, res: Response) {
         : null,
       triage_result: conversation?.triage_result ?? null,
       urgency: preConsult?.urgency || appointment.urgency || conversation?.urgency || '',
+      urgency_guidance: guidanceFor(preConsult?.urgency || appointment.urgency || conversation?.urgency || ''),
+      ai_assist: appointment.ai_assist ?? null,
       queue: queue
         ? {
             queue_id: queue.queue_id,
@@ -263,6 +269,52 @@ export async function handleConsultation(req: Request, res: Response) {
       notes,
     },
   });
+}
+
+export async function handleDiagnoseConsultation(req: Request, res: Response) {
+  const { appointmentId } = req.params;
+  if (!appointmentId) throw Errors.badRequest('appointmentId is required');
+
+  const doctor = await getDoctorForUser(req.user!.user_id);
+  if (!doctor) throw Errors.notFound('Doctor record not found');
+
+  const appointment = await Appointment.findOne({ appointment_id: appointmentId }).lean();
+  if (!appointment) throw Errors.notFound('Appointment not found');
+  if (appointment.doctor_id !== doctor.doctor_id) throw Errors.forbidden();
+
+  const patient = await Patient.findOne({ patient_id: appointment.patient_id }).lean();
+  if (!patient) throw Errors.notFound('Patient not found');
+  const preConsult = await PreConsultation.findOne({ appointment_id: appointmentId }).lean();
+  const notes = await DoctorNote.find({ appointment_id: appointmentId }).sort({ created_at: -1 }).limit(8).lean();
+
+  const assist = await aiDiagnose({
+    patient: {
+      age: patient.age,
+      gender: patient.gender,
+      allergies: patient.allergies,
+      existing_conditions: patient.existing_conditions,
+      medical_history: patient.medical_history,
+    },
+    preconsult_summary: preConsult
+      ? {
+          chief_complaint: preConsult.chief_complaint,
+          symptoms: preConsult.symptoms,
+          medications: preConsult.medications,
+          allergies: preConsult.allergies,
+          medical_history: preConsult.medical_history,
+          lifestyle_notes: preConsult.lifestyle_notes,
+          vital_signs: preConsult.vital_signs,
+          clinical_summary: preConsult.clinical_summary,
+          urgency: preConsult.urgency,
+        }
+      : {},
+    notes: notes.map((note) => ({ content: note.content, created_at: note.created_at })),
+    reason: appointment.reason,
+    urgency: preConsult?.urgency || appointment.urgency,
+  });
+
+  await Appointment.updateOne({ appointment_id: appointmentId }, { $set: { ai_assist: assist } });
+  res.json({ success: true, data: assist });
 }
 
 export async function handleCreateNote(req: Request, res: Response) {

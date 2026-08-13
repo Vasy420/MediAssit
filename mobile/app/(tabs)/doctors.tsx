@@ -259,7 +259,7 @@ export default function DoctorsScreen() {
           <FadeSlide>
           <Card style={styles.suggestCard}>
             <Text style={styles.suggestTitle}>Suggested times</Text>
-            <Text style={styles.suggestSubtitle}>Ranked by doctor availability and estimated wait</Text>
+            <Text style={styles.suggestSubtitle}>Ranked by wait time, experience, and service rating</Text>
             {suggestions.slice(0, 5).map((slot) => (
               <Pressable key={`${slot.doctor_id}-${slot.date}-${slot.time}`} onPress={() => openSuggested(slot)} style={({ pressed }) => [styles.suggestRow, pressed && styles.pressed]}>
                 <View style={{ flex: 1 }}>
