@@ -6,6 +6,7 @@ import { fakePatientSummary } from '../../src/data/testData';
 import { useSettings } from '../../src/contexts/SettingsContext';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
+import { FadeSlide, Stagger } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
 import { StatusBadge } from '../../src/ui/StatusBadge';
 import { TextField } from '../../src/ui/TextField';
@@ -94,13 +95,16 @@ export default function PatientsScreen() {
   return (
     <Screen padded={false}>
     <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Patients</Text>
-      <Text style={styles.sectionTitle}>Patient History</Text>
+      <FadeSlide>
+        <Text style={styles.title}>Patients</Text>
+        <Text style={styles.sectionTitle}>Patient History</Text>
+      </FadeSlide>
       {history.length === 0 ? (
         <Text style={styles.emptyText}>No patient history yet.</Text>
       ) : (
-        history.map((item) => (
-          <Pressable key={item.patient_id} onPress={() => { setPatientId(item.patient_id); void loadPatient(item.patient_id); }} style={({ pressed }) => [styles.historyCard, pressed && styles.pressed]}>
+        history.map((item, index) => (
+          <Stagger key={item.patient_id} index={index}>
+          <Pressable onPress={() => { setPatientId(item.patient_id); void loadPatient(item.patient_id); }} style={({ pressed }) => [styles.historyCard, pressed && styles.pressed]}>
             <View style={styles.historyHeader}>
               <Text style={styles.historyName}>{item.name}</Text>
               <Text style={styles.historyCount}>{item.visit_count} visit{item.visit_count === 1 ? '' : 's'}</Text>
@@ -109,6 +113,7 @@ export default function PatientsScreen() {
             {item.last_visit ? <Text style={styles.historyMeta}>Last visit: {new Date(item.last_visit).toLocaleDateString()} {item.last_time ?? ''}</Text> : null}
             <Text style={styles.historyStatus}>{item.last_status?.replace(/_/g, ' ') ?? 'No status'}</Text>
           </Pressable>
+          </Stagger>
         ))
       )}
 
@@ -120,7 +125,7 @@ export default function PatientsScreen() {
           placeholder="Enter patient ID (e.g., P001)"
           containerStyle={styles.searchInput}
         />
-        <Button title="Search" style={styles.searchBtn} onPress={searchPatient} disabled={loading} loading={loading} />
+        <Button title="Search" icon="search-outline" style={styles.searchBtn} onPress={searchPatient} disabled={loading} loading={loading} />
       </View>
       {testMode && <Text style={styles.testHint}>Test mode: search `FAKE-P001` to view demo patient data.</Text>}
 
@@ -151,16 +156,37 @@ export default function PatientsScreen() {
           {patient.preconsult_summary && (
             <>
               <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Pre-Consultation Summary</Text>
+              {(patient.preconsult_summary as { clinical_summary?: string }).clinical_summary ? (
+                <Text style={styles.field}>{(patient.preconsult_summary as { clinical_summary: string }).clinical_summary}</Text>
+              ) : null}
               {(patient.preconsult_summary as { chief_complaint?: string })?.chief_complaint && (
                 <Text style={styles.field}>
                   Complaint: {(patient.preconsult_summary as { chief_complaint: string }).chief_complaint}
                 </Text>
               )}
+              {Array.isArray((patient.preconsult_summary as { symptoms?: { severity?: string; duration?: string }[] }).symptoms) &&
+                (patient.preconsult_summary as { symptoms: { severity?: string; duration?: string }[] }).symptoms.map((item, index) => (
+                  <Text key={index} style={styles.field}>Symptoms: {item.severity || 'n/a'} · {item.duration || 'n/a'}</Text>
+                ))}
               {(patient.preconsult_summary as { medications?: string[] })?.medications && (
                 <Text style={styles.field}>
                   Medications: {(patient.preconsult_summary as { medications: string[] }).medications.join(', ') || 'None'}
                 </Text>
               )}
+              {(patient.preconsult_summary as { allergies?: string[] })?.allergies && (
+                <Text style={styles.field}>
+                  Allergies: {(patient.preconsult_summary as { allergies: string[] }).allergies.join(', ') || 'None'}
+                </Text>
+              )}
+              {(patient.preconsult_summary as { medical_history?: string })?.medical_history ? (
+                <Text style={styles.field}>History: {(patient.preconsult_summary as { medical_history: string }).medical_history}</Text>
+              ) : null}
+              {(patient.preconsult_summary as { lifestyle_notes?: string })?.lifestyle_notes ? (
+                <Text style={styles.field}>Lifestyle: {(patient.preconsult_summary as { lifestyle_notes: string }).lifestyle_notes}</Text>
+              ) : null}
+              {(patient.preconsult_summary as { vital_signs?: { temperature?: string } })?.vital_signs?.temperature ? (
+                <Text style={styles.field}>Temperature: {(patient.preconsult_summary as { vital_signs: { temperature: string } }).vital_signs.temperature}</Text>
+              ) : null}
             </>
           )}
 
@@ -197,7 +223,7 @@ const styles = StyleSheet.create({
   lookupTitle: { ...typography.heading, color: colors.ink, marginTop: spacing.xxl, marginBottom: spacing.md },
   searchRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg, alignItems: 'flex-end' },
   searchInput: { flex: 1 },
-  searchBtn: { minWidth: 92 },
+  searchBtn: { minWidth: 118 },
   testHint: { ...typography.caption, color: colors.warning, marginBottom: spacing.md },
   emptyText: { ...typography.body, color: colors.inkSubtle, textAlign: 'center', marginTop: spacing.xl },
   resultCard: { padding: spacing.lg },

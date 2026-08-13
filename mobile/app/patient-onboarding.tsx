@@ -103,7 +103,7 @@ export default function PatientOnboardingScreen() {
         </Card>
 
         {error ? <Text style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
-        <Button title={saving ? 'Saving...' : `Continue${user?.name ? `, ${user.name.split(' ')[0]}` : ''}`} onPress={saveProfile} loading={saving} disabled={saving} />
+        <Button title={saving ? 'Saving...' : `Continue${user?.name ? `, ${user.name.split(' ')[0]}` : ''}`} icon="arrow-forward-outline" size="lg" onPress={saveProfile} loading={saving} disabled={saving} />
       </ScrollView>
     </Screen>
   );

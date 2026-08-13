@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { listDoctors, getDoctor, getAvailability, getDoctorForUser, updateDoctorProfile } from '../services/doctorService.js';
+import { listDoctors, getDoctor, getAvailability, getDoctorForUser, updateDoctorProfile, updateDoctorStatus } from '../services/doctorService.js';
 import { Errors } from '../utils/ApiError.js';
 
 export async function handleListDoctors(req: Request, res: Response) {
@@ -27,5 +27,13 @@ export async function handleGetMyDoctor(req: Request, res: Response) {
 export async function handleUpdateMyDoctor(req: Request, res: Response) {
   if (req.user!.role !== 'doctor') throw Errors.forbidden('Only doctors can update doctor profile');
   const doctor = await updateDoctorProfile(req.user!.user_id, req.body);
+  res.json({ success: true, data: { doctor } });
+}
+
+export async function handleUpdateMyStatus(req: Request, res: Response) {
+  if (req.user!.role !== 'doctor') throw Errors.forbidden('Only doctors can update status');
+  const status = req.body.status as 'available' | 'busy' | 'offline';
+  if (!['available', 'busy', 'offline'].includes(status)) throw Errors.badRequest('Invalid status');
+  const doctor = await updateDoctorStatus(req.user!.user_id, status);
   res.json({ success: true, data: { doctor } });
 }

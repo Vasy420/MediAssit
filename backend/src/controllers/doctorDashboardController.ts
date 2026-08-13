@@ -43,9 +43,15 @@ export async function handleDoctorDashboard(req: Request, res: Response) {
     if (urgencyBreakdown[key] !== undefined) urgencyBreakdown[key]++;
   }
 
+  const preconsults = await PreConsultation.find({
+    appointment_id: { $in: appointments.map((a) => a.appointment_id) },
+  }).lean();
+  const preconsultMap = new Map(preconsults.map((row) => [row.appointment_id, row]));
+
   const appointmentViews = appointments.map((a) => {
     const p = patientMap.get(a.patient_id);
     const queue = queueEntries.find((q) => q.appointment_id === a.appointment_id);
+    const preconsult = preconsultMap.get(a.appointment_id);
     return {
       appointment_id: a.appointment_id,
       patient_id: a.patient_id,
@@ -56,17 +62,22 @@ export async function handleDoctorDashboard(req: Request, res: Response) {
       status: a.status,
       queue_position: queue?.queue_token ?? null,
       queue_status: queue?.status ?? null,
+      preconsult_status: preconsult?.status ?? null,
+      chief_complaint: preconsult?.chief_complaint || a.reason || '',
     };
   });
 
   res.json({
-    doctor_id: doctor.doctor_id,
-    doctor_name: doctor.name,
-    specialization: doctor.specialization,
-    today_appointments: appointmentViews,
-    total_today: appointments.length,
-    queue_length: queueEntries.length,
-    urgency_breakdown: urgencyBreakdown,
+    success: true,
+    data: {
+      doctor_id: doctor.doctor_id,
+      doctor_name: doctor.name,
+      specialization: doctor.specialization,
+      today_appointments: appointmentViews,
+      total_today: appointments.length,
+      queue_length: queueEntries.length,
+      urgency_breakdown: urgencyBreakdown,
+    },
   });
 }
 
@@ -102,43 +113,48 @@ export async function handlePatientSummary(req: Request, res: Response) {
     .lean();
 
   res.json({
-    patient: {
-      patient_id: patient.patient_id,
-      name: patient.name,
-      age: patient.age,
-      gender: patient.gender,
-      blood_group: patient.blood_group,
-      existing_conditions: patient.existing_conditions,
-      allergies: patient.allergies,
-      medical_history: patient.medical_history,
-      emergency_contact: patient.emergency_contact,
+    success: true,
+    data: {
+      patient: {
+        patient_id: patient.patient_id,
+        name: patient.name,
+        age: patient.age,
+        gender: patient.gender,
+        blood_group: patient.blood_group,
+        existing_conditions: patient.existing_conditions,
+        allergies: patient.allergies,
+        medical_history: patient.medical_history,
+        emergency_contact: patient.emergency_contact,
+      },
+      preconsult_summary: preConsult
+        ? {
+            chief_complaint: preConsult.chief_complaint,
+            symptoms: preConsult.symptoms,
+            medications: preConsult.medications,
+            allergies: preConsult.allergies,
+            medical_history: preConsult.medical_history,
+            lifestyle_notes: preConsult.lifestyle_notes,
+            vital_signs: preConsult.vital_signs,
+            triage_context: preConsult.triage_context,
+            clinical_summary: preConsult.clinical_summary,
+            urgency: preConsult.urgency,
+          }
+        : null,
+      triage_result: conversation?.triage_result ?? null,
+      urgency: preConsult?.urgency || conversation?.urgency || '',
+      recent_reports: reports.map((r) => ({
+        report_id: r.report_id,
+        diagnosis: r.doctor_diagnosis,
+        date: r.created_at,
+      })),
+      recent_appointments: pastAppointments.map((a) => ({
+        appointment_id: a.appointment_id,
+        date: a.date,
+        time: a.time,
+        reason: a.reason,
+        status: a.status,
+      })),
     },
-    preconsult_summary: preConsult
-      ? {
-          chief_complaint: preConsult.chief_complaint,
-          symptoms: preConsult.symptoms,
-          medications: preConsult.medications,
-          allergies: preConsult.allergies,
-          medical_history: preConsult.medical_history,
-          lifestyle_notes: preConsult.lifestyle_notes,
-          vital_signs: preConsult.vital_signs,
-          triage_context: preConsult.triage_context,
-        }
-      : null,
-    triage_result: conversation?.triage_result ?? null,
-    urgency: conversation?.urgency ?? '',
-    recent_reports: reports.map((r) => ({
-      report_id: r.report_id,
-      diagnosis: r.doctor_diagnosis,
-      date: r.created_at,
-    })),
-    recent_appointments: pastAppointments.map((a) => ({
-      appointment_id: a.appointment_id,
-      date: a.date,
-      time: a.time,
-      reason: a.reason,
-      status: a.status,
-    })),
   });
 }
 
@@ -168,35 +184,144 @@ export async function handlePatientHistory(req: Request, res: Response) {
   res.json({ success: true, data: history });
 }
 
+export async function handleConsultation(req: Request, res: Response) {
+  const { appointmentId } = req.params;
+  if (!appointmentId) throw Errors.badRequest('appointmentId is required');
+
+  const doctor = await getDoctorForUser(req.user!.user_id);
+  if (!doctor) throw Errors.notFound('Doctor record not found');
+
+  const appointment = await Appointment.findOne({ appointment_id: appointmentId }).lean();
+  if (!appointment) throw Errors.notFound('Appointment not found');
+  if (appointment.doctor_id !== doctor.doctor_id) throw Errors.forbidden();
+
+  const patient = await Patient.findOne({ patient_id: appointment.patient_id }).lean();
+  if (!patient) throw Errors.notFound('Patient not found');
+
+  const preConsult = await PreConsultation.findOne({ appointment_id: appointmentId }).lean();
+  const conversation = await Conversation.findOne({
+    patient_id: appointment.patient_id,
+    status: 'completed',
+  })
+    .sort({ updated_at: -1 })
+    .lean();
+  const queue = await Queue.findOne({ appointment_id: appointmentId }).sort({ created_at: -1 }).lean();
+  const notes = await DoctorNote.find({
+    $or: [
+      { appointment_id: appointmentId },
+      ...(queue?.queue_id ? [{ queue_id: queue.queue_id }] : []),
+    ],
+  })
+    .sort({ created_at: -1 })
+    .lean();
+
+  res.json({
+    success: true,
+    data: {
+      appointment: {
+        appointment_id: appointment.appointment_id,
+        date: appointment.date,
+        time: appointment.time,
+        reason: appointment.reason,
+        status: appointment.status,
+        urgency: appointment.urgency,
+      },
+      patient: {
+        patient_id: patient.patient_id,
+        name: patient.name,
+        age: patient.age,
+        gender: patient.gender,
+        blood_group: patient.blood_group,
+        existing_conditions: patient.existing_conditions,
+        allergies: patient.allergies,
+        medical_history: patient.medical_history,
+      },
+      preconsult_summary: preConsult
+        ? {
+            chief_complaint: preConsult.chief_complaint,
+            symptoms: preConsult.symptoms,
+            medications: preConsult.medications,
+            allergies: preConsult.allergies,
+            medical_history: preConsult.medical_history,
+            lifestyle_notes: preConsult.lifestyle_notes,
+            vital_signs: preConsult.vital_signs,
+            clinical_summary: preConsult.clinical_summary,
+            urgency: preConsult.urgency,
+            status: preConsult.status,
+          }
+        : null,
+      triage_result: conversation?.triage_result ?? null,
+      urgency: preConsult?.urgency || appointment.urgency || conversation?.urgency || '',
+      queue: queue
+        ? {
+            queue_id: queue.queue_id,
+            queue_token: queue.queue_token,
+            status: queue.status,
+            position: null,
+          }
+        : null,
+      notes,
+    },
+  });
+}
+
 export async function handleCreateNote(req: Request, res: Response) {
   const { queueId } = req.params;
-  const { content } = req.body as { content: string };
+  const { content, appointment_id } = req.body as { content: string; appointment_id?: string };
   if (!content) throw Errors.badRequest('content is required');
 
   const doctor = await getDoctorForUser(req.user!.user_id);
   if (!doctor) throw Errors.notFound('Doctor record not found');
 
-  const queueEntry = await Queue.findOne({ queue_id: queueId }).lean();
-  if (!queueEntry) throw Errors.notFound('Queue entry not found');
+  let patientId = '';
+  let appointmentId = appointment_id || '';
+  let resolvedQueueId = queueId || '';
+
+  if (queueId) {
+    const queueEntry = await Queue.findOne({ queue_id: queueId }).lean();
+    if (!queueEntry) throw Errors.notFound('Queue entry not found');
+    if (queueEntry.doctor_id !== doctor.doctor_id) throw Errors.forbidden();
+    patientId = queueEntry.patient_id;
+    appointmentId = appointmentId || queueEntry.appointment_id;
+    resolvedQueueId = queueEntry.queue_id;
+  } else if (appointmentId) {
+    const appointment = await Appointment.findOne({ appointment_id: appointmentId }).lean();
+    if (!appointment) throw Errors.notFound('Appointment not found');
+    if (appointment.doctor_id !== doctor.doctor_id) throw Errors.forbidden();
+    patientId = appointment.patient_id;
+    const queueEntry = await Queue.findOne({ appointment_id: appointmentId }).lean();
+    resolvedQueueId = queueEntry?.queue_id || '';
+  } else {
+    throw Errors.badRequest('appointment_id or queue id is required');
+  }
 
   const noteId = await nextId('DN', 3);
   const note = await DoctorNote.create({
     note_id: noteId,
     doctor_id: doctor.doctor_id,
-    queue_id: queueId,
-    patient_id: queueEntry.patient_id,
+    queue_id: resolvedQueueId,
+    appointment_id: appointmentId,
+    patient_id: patientId,
     content,
   });
 
-  res.status(201).json(note);
+  res.status(201).json({ success: true, data: note });
 }
 
 export async function handleGetNotes(req: Request, res: Response) {
   const { queueId } = req.params;
+  const appointmentId = typeof req.query.appointment_id === 'string' ? req.query.appointment_id : '';
 
-  const notes = await DoctorNote.find({ queue_id: queueId })
+  const filter = queueId
+    ? { queue_id: queueId }
+    : appointmentId
+      ? { appointment_id: appointmentId }
+      : null;
+  if (!filter) throw Errors.badRequest('queue id or appointment_id is required');
+
+  const notes = await DoctorNote.find(filter)
     .sort({ created_at: -1 })
     .lean();
 
-  res.json(notes);
+  res.json({ success: true, data: notes });
 }

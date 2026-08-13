@@ -9,7 +9,7 @@
     "start": "node dist/server.js",
     "build": "tsc",
     "seed": "tsx src/seed/seed.ts",
-    "test": "node --import tsx --test tests/*.test.ts"
+    "test": "node --import tsx --test --test-concurrency=1 tests/*.test.ts"
   },
   "engines": {
     "node": ">=20"
@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "mongodb-memory-server": "^11.2.0",
+    "supertest": "^7.1.4",
     "tsx": "^4.23.11",
     "typescript": "^7.0.2"
   }

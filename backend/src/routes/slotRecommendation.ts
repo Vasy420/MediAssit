@@ -3,6 +3,9 @@ import { requireAuth } from '../middleware/auth.js';
 import { aiRecommendSlots } from '../services/aiClient.js';
 import { listDoctors, getAvailability } from '../services/doctorService.js';
 import { listDoctorQueue, AVG_CONSULT_MINUTES } from '../services/queueAgent.js';
+import { latestPatientUrgency } from '../services/preconsultService.js';
+import { getPatientForUser } from '../services/patientService.js';
+import { addDaysIso } from '../utils/time.js';
 
 export const slotRouter = Router();
 
@@ -13,6 +16,15 @@ slotRouter.post('/recommend', async (req: Request, res: Response) => {
     urgency?: string;
     recommended_specialties?: { name: string; score: number }[];
   };
+
+  let resolvedUrgency = urgency || '';
+  if (!resolvedUrgency && req.user?.role === 'patient') {
+    const patient = await getPatientForUser(req.user.user_id);
+    if (patient) {
+      resolvedUrgency = (await latestPatientUrgency(patient.patient_id)) || 'green';
+    }
+  }
+  if (!resolvedUrgency) resolvedUrgency = 'green';
 
   const doctors = await listDoctors();
   const slots: {
@@ -26,41 +38,51 @@ slotRouter.post('/recommend', async (req: Request, res: Response) => {
     estimated_wait_minutes: number;
   }[] = [];
 
-  const today = new Date().toISOString().split('T')[0];
+  for (let offset = 0; offset < 3; offset += 1) {
+    const date = addDaysIso(offset);
+    for (const doctor of doctors.slice(0, 10)) {
+      try {
+        const avail = await getAvailability(doctor.doctor_id, date);
+        if (avail.slots.length === 0) continue;
 
-  for (const doctor of doctors.slice(0, 10)) {
-    try {
-      const avail = await getAvailability(doctor.doctor_id, today);
-      if (avail.slots.length === 0) continue;
+        const queue = await listDoctorQueue(doctor.doctor_id);
+        const waitMinutes = queue.length * AVG_CONSULT_MINUTES;
 
-      const queue = await listDoctorQueue(doctor.doctor_id);
-      const waitMinutes = queue.length * AVG_CONSULT_MINUTES;
-
-      for (const time of avail.slots.slice(0, 3)) {
-        slots.push({
-          doctor_id: doctor.doctor_id,
-          doctor_name: doctor.name,
-          specialization: doctor.specialization,
-          date: today,
-          time,
-          consultation_fee: doctor.consultation_fee,
-          rating: doctor.rating,
-          estimated_wait_minutes: waitMinutes,
-        });
+        for (const time of avail.slots.slice(0, 4)) {
+          slots.push({
+            doctor_id: doctor.doctor_id,
+            doctor_name: doctor.name,
+            specialization: doctor.specialization,
+            date,
+            time,
+            consultation_fee: doctor.consultation_fee,
+            rating: doctor.rating,
+            estimated_wait_minutes: waitMinutes,
+          });
+        }
+      } catch {
+        continue;
       }
-    } catch {
-      continue;
     }
   }
 
   try {
     const result = await aiRecommendSlots({
-      urgency: urgency || 'green',
+      urgency: resolvedUrgency,
       recommended_specialties: recommended_specialties || [],
       available_slots: slots,
     });
-    res.json(result);
+    res.json({
+      success: true,
+      data: { recommendations: result.recommendations ?? [], urgency: resolvedUrgency },
+    });
   } catch {
-    res.json({ recommendations: slots.slice(0, 5), fallback: true });
+    const fallback = [...slots]
+      .sort((a, b) => a.estimated_wait_minutes - b.estimated_wait_minutes || a.date.localeCompare(b.date))
+      .slice(0, 5);
+    res.json({
+      success: true,
+      data: { recommendations: fallback, urgency: resolvedUrgency, fallback: true },
+    });
   }
 });

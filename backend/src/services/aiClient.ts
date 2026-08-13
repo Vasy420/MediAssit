@@ -7,7 +7,7 @@ import { extractiveSummary } from './reportSummarizer.js';
 export interface AiChatPayload {
   conversation_id?: string;
   patient_id?: string;
-  patient_context?: { age?: number | null; gender?: string | null; existing_conditions?: string[] };
+  patient_context?: { age?: number | null; gender?: string | null; existing_conditions?: string[]; allergies?: string[] };
   messages: { role: string; text: string }[];
   answers: { key: string; answer: string; rephrased?: boolean }[];
 }
@@ -119,7 +119,7 @@ export interface PreConsultPayload {
   patient_id?: string;
   appointment_id?: string;
   triage_context?: Record<string, unknown>;
-  patient_context?: { age?: number | null; gender?: string | null; existing_conditions?: string[] };
+  patient_context?: { age?: number | null; gender?: string | null; existing_conditions?: string[]; allergies?: string[] };
   messages: { role: string; text: string }[];
   answers: { key: string; answer: string; rephrased?: boolean }[];
 }
@@ -184,12 +184,14 @@ function fallbackPreConsult(payload: PreConsultPayload): PreConsultTurn {
     done: true,
     preconsult_summary: {
       chief_complaint: patientText || 'General consultation',
-      symptoms: payload.answers.map((answer) => answer.answer),
+      symptoms: payload.answers.map((answer) => ({ duration: 'Not reported', severity: answer.answer, associated: '' })),
       medications: [],
-      allergies: [],
-      medical_history: '',
+      allergies: payload.patient_context?.allergies ?? [],
+      medical_history: (payload.patient_context?.existing_conditions ?? []).join(', '),
       lifestyle_notes: '',
       vital_signs: {},
+      clinical_summary: patientText || 'General consultation. Offline pre-consultation fallback was used.',
+      urgency: 'green',
       triage_context: { source: 'local-preconsult-fallback', answers: payload.answers },
     },
   };

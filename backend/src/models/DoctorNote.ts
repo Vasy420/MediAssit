@@ -3,7 +3,8 @@ import { Schema, model, InferSchemaType } from 'mongoose';
 const doctorNoteSchema = new Schema({
   note_id: { type: String, required: true, unique: true, index: true },
   doctor_id: { type: String, required: true, index: true },
-  queue_id: { type: String, required: true, index: true },
+  queue_id: { type: String, default: '', index: true },
+  appointment_id: { type: String, default: '', index: true },
   patient_id: { type: String, required: true },
   content: { type: String, default: '' },
   created_at: { type: Date, default: Date.now },

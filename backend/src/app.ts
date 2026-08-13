@@ -14,6 +14,7 @@ import { patientRouter } from './routes/patients.js';
 import { preconsultRouter } from './routes/preconsult.js';
 import { doctorDashboardRouter } from './routes/doctorDashboard.js';
 import { slotRouter } from './routes/slotRecommendation.js';
+import { notificationRouter } from './routes/notifications.js';
 
 export function createApp(): Express {
   const app = express();
@@ -51,6 +52,7 @@ export function createApp(): Express {
   app.use('/api/preconsult', preconsultRouter);
   app.use('/api/doctor-dashboard', doctorDashboardRouter);
   app.use('/api/slots', slotRouter);
+  app.use('/api/notifications', notificationRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

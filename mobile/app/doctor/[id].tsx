@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { api } from '../../src/api/client';
 import { fakeDoctors } from '../../src/data/testData';
 import { useSettings } from '../../src/contexts/SettingsContext';
-import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
+import { FadeSlide, ScaleIn } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
 import { StatusBadge } from '../../src/ui/StatusBadge';
 import { colors, layout, radii, spacing, typography } from '../../src/ui/theme';
@@ -34,7 +34,6 @@ function nextBookableDate() {
 
 export default function DoctorDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const { testMode, theme } = useSettings();
   const [doctor, setDoctor] = useState<DoctorDetails | null>(null);
   const [slots, setSlots] = useState<string[]>([]);
@@ -85,6 +84,7 @@ export default function DoctorDetailScreen() {
   return (
     <Screen padded={false} style={{ backgroundColor: theme.background }}>
       <ScrollView contentContainerStyle={styles.content}>
+        <ScaleIn>
         <Card style={styles.hero}>
           <View style={[styles.avatar, { backgroundColor: theme.primarySoft }]}>
             <Text style={[styles.avatarText, { color: theme.primary }]}>{doctor.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</Text>
@@ -94,7 +94,9 @@ export default function DoctorDetailScreen() {
           {doctor.department ? <Text style={[styles.muted, { color: theme.inkMuted }]}>{doctor.department}</Text> : null}
           {id.startsWith('FAKE-') && <StatusBadge label="Fake test data" tone="warning" />}
         </Card>
+        </ScaleIn>
 
+        <FadeSlide delay={100}>
         <Card style={styles.infoCard}>
           <Text style={[styles.sectionTitle, { color: theme.ink }]}>Professional information</Text>
           <InfoRow label="Hospital / clinic" value={doctor.hospital || 'Not provided'} />
@@ -104,7 +106,9 @@ export default function DoctorDetailScreen() {
           <InfoRow label="Room" value={doctor.room_number || 'Not provided'} />
           <InfoRow label="Rating" value={doctor.rating ? `${doctor.rating.toFixed(1)} / 5` : 'Not rated yet'} />
         </Card>
+        </FadeSlide>
 
+        <FadeSlide delay={180}>
         <Card style={styles.infoCard}>
            <Text style={[styles.sectionTitle, { color: theme.ink }]}>Available times on {new Date(`${availabilityDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
           {slots.length === 0 ? <Text style={[styles.muted, { color: theme.inkMuted }]}>No remaining times today.</Text> : (
@@ -113,8 +117,7 @@ export default function DoctorDetailScreen() {
             </View>
           )}
         </Card>
-
-        <Button title="Back to doctors" variant="secondary" onPress={() => router.back()} />
+        </FadeSlide>
       </ScrollView>
     </Screen>
   );

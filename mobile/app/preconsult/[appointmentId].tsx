@@ -3,8 +3,12 @@ import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndic
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
 import { Button } from '../../src/ui/Button';
+import { Card } from '../../src/ui/Card';
+import { BubbleIn, FadeSlide } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
-import { colors, layout, radii, spacing, typography } from '../../src/ui/theme';
+import { StatusBadge } from '../../src/ui/StatusBadge';
+import { useSettings } from '../../src/contexts/SettingsContext';
+import { layout, radii, spacing, typography } from '../../src/ui/theme';
 
 interface QuestionOption {
   id: string;
@@ -25,7 +29,12 @@ interface PreConsultResult {
   done: boolean;
 }
 
-type PreConsultTurn = PreConsultQuestion | PreConsultResult;
+type PreConsultTurn = (PreConsultQuestion | PreConsultResult) & {
+  pc_id?: string;
+  status?: string;
+  messages?: { role: string; text: string }[];
+  answers?: { key: string; answer: string; rephrased?: boolean }[];
+};
 
 function fakeQuestion(index: number): PreConsultQuestion {
   const questions = [
@@ -40,7 +49,15 @@ function fakeQuestion(index: number): PreConsultQuestion {
 function fakeResult(): PreConsultResult {
   return {
     type: 'result',
-    preconsult_summary: { chief_complaint: 'Demo appointment concern', symptoms: ['Demo symptom'], medications: [], allergies: [], medical_history: 'Fake test data', triage_context: { urgency: 'green' } },
+    preconsult_summary: {
+      chief_complaint: 'Demo appointment concern',
+      symptoms: [{ duration: 'A few days', severity: 'moderate', associated: '' }],
+      medications: [],
+      allergies: [],
+      medical_history: 'Fake test data',
+      clinical_summary: 'Demo patient presents with a test concern. Severity is moderate.',
+      urgency: 'green',
+    },
     done: true,
   };
 }
@@ -51,13 +68,17 @@ interface ChatMessage {
   options?: QuestionOption[];
 }
 
+function unwrap<T>(res: { data?: T } | T): T {
+  return ((res as { data?: T }).data ?? res) as T;
+}
+
 export default function PreConsultScreen() {
   const { appointmentId } = useLocalSearchParams<{ appointmentId: string }>();
+  const { theme } = useSettings();
   const isFake = appointmentId.startsWith('FAKE-');
   const router = useRouter();
   const [pcId, setPcId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [answers, setAnswers] = useState<{ key: string; answer: string; rephrased: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState(false);
   const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
@@ -66,153 +87,155 @@ export default function PreConsultScreen() {
   const [waitingKey, setWaitingKey] = useState('');
   const scrollRef = useRef<ScrollView>(null);
 
-  const addMessage = useCallback((msg: ChatMessage) => {
-    setMessages((prev) => [...prev, msg]);
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-  }, []);
-
-  const processTurn = useCallback(async (turn: PreConsultTurn) => {
+  const applyHistory = useCallback((history: { role: string; text: string }[] | undefined, turn: PreConsultTurn) => {
+    const mapped: ChatMessage[] = (history ?? []).map((item) => ({
+      role: item.role === 'patient' ? 'user' : 'bot',
+      text: item.text,
+    }));
     if (turn.type === 'question' && turn.question) {
-      addMessage({ role: 'bot', text: turn.question.text, options: turn.question.options });
+      const already = mapped.some((item) => item.role === 'bot' && item.text === turn.question.text);
+      if (!already) mapped.push({ role: 'bot', text: turn.question.text });
+      const last = mapped[mapped.length - 1];
+      if (last?.role === 'bot') last.options = turn.question.options;
       const hasFreeText = turn.question.options.length === 1 && turn.question.options[0].id === 'free_text';
-      if (hasFreeText) {
-        setWaitingForFreeText(true);
-        setWaitingKey(turn.question.key);
-      }
+      setWaitingForFreeText(hasFreeText);
+      setWaitingKey(turn.question.key);
     } else if (turn.type === 'result' && turn.preconsult_summary) {
       setDone(true);
       setSummary(turn.preconsult_summary);
-      addMessage({ role: 'bot', text: 'Your pre-consultation summary has been generated and shared with your doctor.', options: [] });
+      if (!mapped.some((item) => item.text.includes('pre-consultation summary'))) {
+        mapped.push({ role: 'bot', text: 'Your pre-consultation summary has been generated and shared with your doctor.' });
+      }
     }
-  }, [addMessage]);
+    setMessages(mapped);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+  }, []);
 
   const startInterview = useCallback(async () => {
     try {
       setLoading(true);
       if (isFake) {
         setPcId('FAKE-PC-001');
-        await processTurn(fakeQuestion(0));
+        applyHistory([], fakeQuestion(0));
         return;
       }
-      const res = await api.post<PreConsultTurn & { pc_id: string }>('/api/preconsult/start', {
-        appointment_id: appointmentId,
-      });
-      const turn = (res.data ?? res) as unknown as PreConsultTurn & { pc_id: string };
+      const res = await api.post<PreConsultTurn>('/api/preconsult/start', { appointment_id: appointmentId });
+      const turn = unwrap(res);
       if (turn.pc_id) setPcId(turn.pc_id);
-      await processTurn(turn);
-    } catch (e) {
-      addMessage({ role: 'bot', text: 'Failed to start pre-consultation. Please try again.', options: [] });
+      applyHistory(turn.messages, turn);
+    } catch {
+      setMessages([{ role: 'bot', text: 'Failed to start pre-consultation. Please try again.' }]);
     } finally {
       setLoading(false);
     }
-  }, [appointmentId, isFake, processTurn, addMessage]);
+  }, [appointmentId, isFake, applyHistory]);
 
   useEffect(() => {
     void startInterview();
   }, [startInterview]);
 
-  const handleOptionSelect = useCallback(async (option: QuestionOption) => {
-    if (option.key === 'free_text') return;
+  const sendAnswer = useCallback(async (key: string, answer: string, label: string, message?: string) => {
     if (!pcId) return;
-
-    addMessage({ role: 'user', text: option.text, options: [] });
+    setMessages((prev) => [...prev.map((item) => ({ ...item, options: undefined })), { role: 'user', text: label }]);
+    setWaitingForFreeText(false);
     setLoading(true);
-
-    const newAnswers = [...answers, { key: option.key, answer: option.key, rephrased: false }];
-    setAnswers(newAnswers);
-
     try {
       if (isFake) {
-        await processTurn(newAnswers.length >= 3 ? fakeResult() : fakeQuestion(newAnswers.length));
+        const nextIndex = key === 'chief_complaint.symptoms' || key === 'chief_complaint' ? 1 : 2;
+        applyHistory([], nextIndex >= 2 ? fakeResult() : fakeQuestion(nextIndex));
         return;
       }
       const res = await api.post<PreConsultTurn>('/api/preconsult/answer', {
         pc_id: pcId,
-        answers: newAnswers,
+        message: message ?? label,
+        answers: [{ key, answer }],
       });
-      const turn = (res.data ?? res) as unknown as PreConsultTurn;
-      await processTurn(turn);
+      applyHistory(unwrap(res).messages, unwrap(res));
     } catch {
-      addMessage({ role: 'bot', text: 'Something went wrong. Please try again.', options: [] });
+      setMessages((prev) => [...prev, { role: 'bot', text: 'Something went wrong. Please try again.' }]);
     } finally {
       setLoading(false);
     }
-  }, [pcId, answers, isFake, addMessage, processTurn]);
+  }, [pcId, isFake, applyHistory]);
 
-  const handleFreeTextSubmit = useCallback(async () => {
-    if (!freeText.trim() || !pcId) return;
+  const handleOptionSelect = useCallback((option: QuestionOption) => {
+    if (option.id === 'free_text' || option.key === 'free_text') {
+      setWaitingForFreeText(true);
+      setWaitingKey(option.key || option.id);
+      return;
+    }
+    void sendAnswer(option.key || option.id, option.id, option.text, option.id === 'start' ? undefined : option.text);
+  }, [sendAnswer]);
+
+  const handleFreeTextSubmit = useCallback(() => {
+    if (!freeText.trim()) return;
     const text = freeText.trim();
     setFreeText('');
-    setWaitingForFreeText(false);
+    void sendAnswer(waitingKey || 'chief_complaint', text, text, text);
+  }, [freeText, waitingKey, sendAnswer]);
 
-    addMessage({ role: 'user', text, options: [] });
-    setLoading(true);
-
-    const newAnswers = [...answers, { key: waitingKey, answer: text, rephrased: false }];
-    setAnswers(newAnswers);
-
-    try {
-      if (isFake) {
-        await processTurn(newAnswers.length >= 3 ? fakeResult() : fakeQuestion(newAnswers.length));
-        return;
-      }
-      const res = await api.post<PreConsultTurn>('/api/preconsult/answer', {
-        pc_id: pcId,
-        message: text,
-        answers: newAnswers,
-      });
-      const turn = (res.data ?? res) as unknown as PreConsultTurn;
-      await processTurn(turn);
-    } catch {
-      addMessage({ role: 'bot', text: 'Something went wrong. Please try again.', options: [] });
-    } finally {
-      setLoading(false);
-    }
-  }, [freeText, pcId, waitingKey, answers, isFake, addMessage, processTurn]);
+  const urgency = typeof summary?.urgency === 'string' ? summary.urgency : '';
 
   return (
     <Screen padded={false}>
       <ScrollView ref={scrollRef} style={styles.chatArea} contentContainerStyle={styles.chatContent}>
         {messages.map((msg, i) => (
-          <View key={i} style={msg.role === 'bot' ? styles.botBubble : styles.userBubble}>
-            <Text style={msg.role === 'bot' ? styles.botText : styles.userText}>{msg.text}</Text>
+          <BubbleIn key={`${msg.role}-${i}`} side={msg.role === 'user' ? 'user' : 'bot'}>
+          <View style={msg.role === 'bot' ? [styles.botBubble, { backgroundColor: theme.surface, borderColor: theme.border }] : [styles.userBubble, { backgroundColor: theme.primary }]}>
+            <Text style={msg.role === 'bot' ? [styles.botText, { color: theme.ink }] : [styles.userText, { color: theme.onPrimary }]}>{msg.text}</Text>
             {msg.options && msg.options.length > 0 && !done && i === messages.length - 1 && (
               <View style={styles.optionsRow}>
                 {msg.options.map((opt) => (
                   <Pressable
                     key={opt.id}
-                    style={({ pressed }) => [styles.optionChip, pressed && styles.pressed]}
+                    style={({ pressed }) => [styles.optionChip, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }, pressed && styles.pressed]}
                     onPress={() => handleOptionSelect(opt)}
                     disabled={loading}
                   >
                     {opt.emoji ? <Text style={styles.optionEmoji}>{opt.emoji}</Text> : null}
-                    <Text style={styles.optionText}>{opt.text}</Text>
+                    <Text style={[styles.optionText, { color: theme.ink }]}>{opt.text}</Text>
                   </Pressable>
                 ))}
               </View>
             )}
           </View>
+          </BubbleIn>
         ))}
-        {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.md }} />}
+        {loading && <ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: spacing.md }} />}
+
+        {done && summary && (
+          <FadeSlide>
+          <Card style={styles.summaryCard}>
+            <Text style={[styles.summaryTitle, { color: theme.ink }]}>Pre-consultation summary</Text>
+            {urgency ? <StatusBadge label={urgency} tone={urgency === 'red' ? 'danger' : urgency === 'green' ? 'success' : 'warning'} /> : null}
+            {typeof summary.clinical_summary === 'string' && summary.clinical_summary ? (
+              <Text style={[styles.summaryBody, { color: theme.inkMuted }]}>{summary.clinical_summary}</Text>
+            ) : null}
+            {typeof summary.chief_complaint === 'string' && summary.chief_complaint ? (
+              <Text style={[styles.summaryField, { color: theme.ink }]}>Complaint: {summary.chief_complaint}</Text>
+            ) : null}
+          </Card>
+          </FadeSlide>
+        )}
       </ScrollView>
 
-      {waitingForFreeText && (
-        <View style={styles.inputArea}>
+      {waitingForFreeText && !done && (
+        <View style={[styles.inputArea, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, { color: theme.ink, backgroundColor: theme.surface, borderColor: theme.borderStrong }]}
             value={freeText}
             onChangeText={setFreeText}
             placeholder="Type your answer..."
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={theme.inkSubtle}
             multiline
           />
-          <Button title="Send" style={styles.sendBtn} onPress={handleFreeTextSubmit} disabled={!freeText.trim() || loading} loading={loading} />
+          <Button title="Send" icon="send-outline" style={styles.sendBtn} onPress={handleFreeTextSubmit} disabled={!freeText.trim() || loading} loading={loading} />
         </View>
       )}
 
-      {done && summary && (
-        <View style={styles.doneArea}>
-          <Button title="Back to Appointments" style={styles.backBtn} onPress={() => router.back()} />
+      {done && (
+        <View style={[styles.doneArea, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
+          <Button title="Back to visits" icon="arrow-back-outline" variant="secondary" style={styles.backBtn} onPress={() => router.back()} />
         </View>
       )}
     </Screen>
@@ -220,21 +243,24 @@ export default function PreConsultScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   chatArea: { flex: 1 },
   chatContent: { padding: layout.horizontalPadding, paddingBottom: spacing.xxxl },
-  botBubble: { alignSelf: 'flex-start', backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, maxWidth: '85%' },
-  userBubble: { alignSelf: 'flex-end', backgroundColor: colors.primary, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md, maxWidth: '85%' },
-  botText: { ...typography.body, color: colors.ink },
-  userText: { ...typography.body, color: colors.white },
+  botBubble: { alignSelf: 'flex-start', borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md, borderWidth: 1, maxWidth: '85%' },
+  userBubble: { alignSelf: 'flex-end', borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.md, maxWidth: '85%' },
+  botText: { ...typography.body },
+  userText: { ...typography.body },
   optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
-  optionChip: { backgroundColor: colors.surfaceMuted, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', minHeight: 44 },
+  optionChip: { borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   optionEmoji: { fontSize: 16, marginRight: spacing.sm },
-  optionText: { ...typography.caption, color: colors.ink },
-  inputArea: { flexDirection: 'row', alignItems: 'flex-end', padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
-  textInput: { flex: 1, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, fontSize: 15, color: colors.ink, maxHeight: 100, backgroundColor: colors.surface },
-  sendBtn: { marginLeft: spacing.sm, width: 78 },
-  doneArea: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
+  optionText: { ...typography.caption },
+  inputArea: { flexDirection: 'row', alignItems: 'flex-end', padding: spacing.md, borderTopWidth: 1 },
+  textInput: { flex: 1, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, fontSize: 15, maxHeight: 100 },
+  sendBtn: { marginLeft: spacing.sm, minWidth: 104 },
+  doneArea: { padding: spacing.md, borderTopWidth: 1 },
   backBtn: { width: '100%' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
+  summaryCard: { marginTop: spacing.md, gap: spacing.sm },
+  summaryTitle: { ...typography.heading },
+  summaryBody: { ...typography.body },
+  summaryField: { ...typography.body },
 });

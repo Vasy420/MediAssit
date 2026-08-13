@@ -101,7 +101,7 @@ export const fakeDoctorDashboard = {
 
 export const fakeDoctorQueue = [
   {
-    queue_id: 'FAKE-Q-001', patient_id: 'FAKE-P001', patient: { name: 'Riya Sharma', age: 29 },
+    queue_id: 'FAKE-Q-001', queue_token: 'Q01', appointment_id: 'FAKE-APPT-101', patient_id: 'FAKE-P001', patient: { name: 'Riya Sharma', age: 29 },
     appointment_time: '09:30 AM', position: 1, priority_score: 702, urgency: 'orange', status: 'waiting', waiting_time: 10, is_fake: true,
   },
   {
@@ -119,7 +119,17 @@ export const fakePatientSummary = {
     patient_id: 'FAKE-P001', name: 'Riya Sharma', age: 29, gender: 'female', blood_group: 'O+',
     existing_conditions: ['Mild asthma'], allergies: ['Dust'], medical_history: 'Uses inhaler as needed.',
   },
-  preconsult_summary: { chief_complaint: 'Shortness of breath after exercise', medications: ['Salbutamol inhaler'] },
+  preconsult_summary: {
+    chief_complaint: 'Shortness of breath after exercise',
+    medications: ['Salbutamol inhaler'],
+    allergies: ['Dust'],
+    medical_history: 'Mild asthma',
+    lifestyle_notes: 'None reported',
+    vital_signs: { temperature: 'Normal (below 37.5°C)' },
+    clinical_summary: '29-year-old patient reports shortness of breath after exercise. Uses a salbutamol inhaler.',
+    urgency: 'orange',
+    symptoms: [{ duration: 'A few days', severity: 'moderate', associated: 'Worse with exertion' }],
+  },
   urgency: 'orange',
   recent_reports: [{ report_id: 'FAKE-REPORT-001', diagnosis: 'Exercise-induced asthma', date: new Date().toISOString() }],
 };

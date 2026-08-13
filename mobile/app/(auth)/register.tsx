@@ -5,10 +5,12 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { api } from '../../src/api/client';
 import type { User } from '../../src/types';
 import { Button } from '../../src/ui/Button';
+import { FadeSlide, ScaleIn } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
 import { TextField } from '../../src/ui/TextField';
 import { PasswordField } from '../../src/ui/PasswordField';
-import { radii, roleThemes, spacing, typography } from '../../src/ui/theme';
+import { useSettings } from '../../src/contexts/SettingsContext';
+import { radii, spacing, typography } from '../../src/ui/theme';
 
 export default function RegisterScreen() {
   const { registerUser } = useAuth();
@@ -19,7 +21,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'patient' | 'doctor'>(initialRole);
   const [loading, setLoading] = useState(false);
-  const theme = roleThemes[role];
+  const { theme } = useSettings();
 
   useEffect(() => {
     if (routeRole === 'doctor' || routeRole === 'patient') setRole(routeRole);
@@ -65,11 +67,16 @@ export default function RegisterScreen() {
     <Screen padded={false} style={{ backgroundColor: theme.background }}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
-        <View style={[styles.logo, { backgroundColor: theme.primary }]}><Text style={[styles.logoText, { color: theme.onPrimary }]}>M+</Text></View>
-        <Text style={[styles.title, { color: theme.ink }]}>Create Account</Text>
-        <Text style={[styles.subtitle, { color: theme.inkMuted }]}>Join MedAssist+ today</Text>
+        <ScaleIn>
+          <View style={[styles.logo, { backgroundColor: theme.primary }]}><Text style={[styles.logoText, { color: theme.onPrimary }]}>M+</Text></View>
+        </ScaleIn>
+        <FadeSlide delay={80}>
+          <Text style={[styles.title, { color: theme.ink }]}>Create Account</Text>
+          <Text style={[styles.subtitle, { color: theme.inkMuted }]}>Join MedAssist+ today</Text>
+        </FadeSlide>
       </View>
 
+      <FadeSlide delay={140}>
       <TextField label="Username" placeholder="Username" value={name} onChangeText={setName} containerStyle={styles.field} />
       <TextField label="Email" placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" containerStyle={styles.field} />
       <PasswordField label="Password" placeholder="Password (min 6 chars)" value={password} onChangeText={setPassword} containerStyle={styles.field} />
@@ -84,7 +91,9 @@ export default function RegisterScreen() {
       <Text style={[styles.hint, { color: theme.inkMuted }]}>{role === 'doctor' ? 'You will complete your professional profile after registration.' : 'You will complete your health details after registration.'}</Text>
 
       <Button
-        title={loading ? 'Registering...' : 'Register'}
+        title={loading ? 'Registering...' : 'Create account'}
+        icon="person-add-outline"
+        size="lg"
         themeOverride={theme}
         style={styles.button}
         onPress={handleRegister}
@@ -95,6 +104,7 @@ export default function RegisterScreen() {
       <Link href={{ pathname: '/(auth)/login', params: { role } }} style={[styles.link, { color: theme.primary }]}>
         Already have an account? Login
       </Link>
+      </FadeSlide>
       </ScrollView>
     </Screen>
   );
@@ -108,7 +118,7 @@ const styles = StyleSheet.create({
   title: { ...typography.title },
   subtitle: { ...typography.body, marginTop: spacing.xs },
   field: { marginBottom: spacing.md },
-  button: { marginTop: spacing.sm },
+  button: { marginTop: spacing.sm, width: '100%' },
   link: { textAlign: 'center', marginTop: spacing.xl, fontSize: 14, fontWeight: '600' },
   accountLabel: { ...typography.label, marginTop: spacing.sm, marginBottom: spacing.sm },
   roleRow: { flexDirection: 'row', gap: spacing.sm },

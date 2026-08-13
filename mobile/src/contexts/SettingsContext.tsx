@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useAuth } from './AuthContext';
 import { createFakeAppointments, fakeDoctorQueue, fakeDoctorReports } from '../data/testData';
 import type { Appointment } from '../types';
-import { themes, type ThemeColors, type ThemeName } from '../ui/theme';
+import { isThemeName, themes, type ThemeColors, type ThemeName } from '../ui/theme';
 
 const THEME_KEY = 'medassist_theme';
 const TEST_MODE_KEY = 'medassist_test_mode';
@@ -66,7 +66,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         AsyncStorage.getItem(THEME_KEY),
         AsyncStorage.getItem(TEST_MODE_KEY),
       ]);
-      if (storedTheme && storedTheme in themes) setThemeNameState(storedTheme as ThemeName);
+      if (isThemeName(storedTheme)) setThemeNameState(storedTheme);
       setTestModeState(storedTestMode === null ? true : storedTestMode === 'true');
     }
     void loadSettings();

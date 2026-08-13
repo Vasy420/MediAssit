@@ -1,7 +1,9 @@
 import { Doctor } from '../models/Doctor.js';
 import { User } from '../models/User.js';
 import { Appointment } from '../models/Appointment.js';
+import { Patient } from '../models/Patient.js';
 import { Errors } from '../utils/ApiError.js';
+import { notify } from './notificationService.js';
 import { addDaysIso, toDisplayTime, todayIso, weekdayName } from '../utils/time.js';
 import { nextId } from '../utils/idGen.js';
 
@@ -45,11 +47,48 @@ export async function updateDoctorProfile(
   };
   if (input.availability !== undefined) values.availability = input.availability;
 
-  return Doctor.findOneAndUpdate(
+  const previous = await Doctor.findOne({ user_id: userId }).select('status doctor_id name').lean();
+  const updated = await Doctor.findOneAndUpdate(
     { user_id: userId },
     { $set: values, $setOnInsert: { doctor_id: await nextId('D') } },
-    { new: true, upsert: true, setDefaultsOnInsert: true },
+    { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true },
   ).lean();
+  if (updated && previous?.status !== 'available' && updated.status === 'available') {
+    await notifyDoctorAvailable(updated.doctor_id, updated.name);
+  }
+  return updated;
+}
+
+export async function updateDoctorStatus(userId: string, status: 'available' | 'busy' | 'offline') {
+  const doctor = await getDoctorForUser(userId);
+  const previous = doctor.status;
+  const updated = await Doctor.findOneAndUpdate(
+    { doctor_id: doctor.doctor_id },
+    { $set: { status } },
+    { returnDocument: 'after' },
+  ).lean();
+  if (previous !== 'available' && status === 'available') {
+    await notifyDoctorAvailable(doctor.doctor_id, doctor.name);
+  }
+  return updated;
+}
+
+export async function notifyDoctorAvailable(doctorId: string, doctorName: string) {
+  const appointments = await Appointment.find({
+    doctor_id: doctorId,
+    status: { $in: ['scheduled', 'confirmed', 'in_queue'] },
+  })
+    .select('patient_id')
+    .lean();
+  const patientIds = [...new Set(appointments.map((row) => row.patient_id))];
+  const patients = await Patient.find({ patient_id: { $in: patientIds } })
+    .select('user_id')
+    .lean();
+  for (const patient of patients) {
+    if (patient.user_id) {
+      await notify.doctorAvailable(patient.user_id, doctorName, doctorId);
+    }
+  }
 }
 
 export async function listDoctors(specialty?: string) {

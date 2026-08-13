@@ -29,6 +29,8 @@ class PreConsultSummary:
     lifestyle_notes: str = ''
     vital_signs: dict = field(default_factory=dict)
     triage_context: dict = field(default_factory=dict)
+    clinical_summary: str = ''
+    urgency: str = 'green'
     generated_at: str = ''
 
 
