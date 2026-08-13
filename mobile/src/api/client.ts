@@ -56,10 +56,28 @@ async function request<T>(
       _onUnauthorized?.();
       throw new Error('Session expired. Please login again.');
     }
-    throw new Error(data.message || data.error || `Request failed with status ${res.status}`);
+    throw new Error(formatApiError(data, res.status));
   }
 
   return data as ApiResponse<T>;
+}
+
+function formatApiError(data: unknown, status: number): string {
+  const payload = (data ?? {}) as { message?: string; error?: string; details?: unknown };
+  const details = payload.details;
+  if (Array.isArray(details) && details.length > 0) {
+    const messages = details
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'msg' in item) return String((item as { msg: unknown }).msg ?? '');
+        return '';
+      })
+      .filter(Boolean);
+    if (messages.length) return [...new Set(messages)].join('. ');
+  }
+  if (payload.message && payload.message !== 'Validation failed') return payload.message;
+  if (payload.error) return payload.error;
+  return payload.message || `Request failed with status ${status}`;
 }
 
 let _onUnauthorized: (() => void) | null = null;

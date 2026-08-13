@@ -29,12 +29,12 @@ AI-powered healthcare navigation and management platform. Streamlines patient tr
 
 ## Features
 
-- **Symptom Triage Chat** — Multi-turn AI conversation to assess symptoms and determine urgency level
-- **Doctor Discovery** — Browse and search doctors by specialization
-- **Appointment Management** — Book, view, and cancel appointments
-- **Priority Queue** — Urgency-weighted triage queue with doctor calling and manual override
-- **Medical Reports** — Upload reports and get AI-generated plain-language summaries
-- **Push Notifications** — Expo push notifications for queue updates and doctor calls
+- **AI Pre-Consultation Interview** — Collects patient basics and symptom follow-ups, then writes a structured summary for the doctor
+- **AI Patient Summary** — Doctor consultation view with the AI summary, symptoms, urgency, and notes
+- **AI Urgency Guidance** — Symptom Check assigns green / yellow / orange / red and applies it to booking
+- **Smart Slot Recommendation** — Suggests times from doctor availability and estimated wait
+- **Essential notifications** — Appointment confirmation, reminder, queue position, and doctor availability (in-app inbox; Expo push optional)
+- **Queue management** — Token, live position, estimated wait, and urgency-based priority
 - **Auth** — JWT-based registration, login, and role-based access (patient/doctor/admin)
 
 ---
@@ -157,6 +157,31 @@ Opens Expo dev tools. Press `w` for web, scan QR for mobile (Expo Go app).
 | PATCH | `/api/queue/:id` | Update queue status (doctor/admin) |
 | PATCH | `/api/queue/:id/override` | Override priority score (doctor/admin) |
 
+### Pre-consultation
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/preconsult/start` | Start or resume the interview for an appointment |
+| POST | `/api/preconsult/answer` | Submit the next answer |
+| GET | `/api/preconsult/:appointmentId` | Fetch the stored interview / summary |
+
+### Slots
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/slots/recommend` | Rank open slots by wait time and how soon they are |
+
+### Doctor dashboard
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/doctor-dashboard/dashboard` | Upcoming appointments and queue snapshot |
+| GET | `/api/doctor-dashboard/consultation/:appointmentId` | Patient details, AI summary, urgency, notes |
+| POST | `/api/doctor-dashboard/notes` | Add a doctor note |
+
+### Notifications
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/notifications` | In-app inbox for the current user |
+| PATCH | `/api/notifications/:id/read` | Mark a notification as read |
+
 ### Medical Reports
 | Method | Path | Description |
 |--------|------|-------------|
@@ -178,7 +203,7 @@ Opens Expo dev tools. Press `w` for web, scan QR for mobile (Expo Go app).
 mediassist/
 ├── ai-service/           # Python FastAPI microservice
 │   ├── app/
-│   │   ├── agents/       # triage, report, appointment, queue agents
+│   │   ├── agents/       # triage, preconsult, slot, report, appointment, queue agents
 │   │   ├── config.py     # Environment config
 │   │   └── main.py       # FastAPI app + route definitions
 │   ├── tests/
@@ -200,6 +225,9 @@ mediassist/
 │   │   ├── (auth)/       # Login & register screens
 │   │   ├── (tabs)/       # Home, AI chat, doctors, appointments, profile
 │   │   ├── reports/      # Medical report detail screen
+│   │   ├── preconsult/   # AI pre-consultation interview
+│   │   ├── doctor/       # Doctor profile + consultation view
+│   │   ├── notifications.tsx
 │   │   └── queue/        # Queue status screen
 │   └── src/
 │       ├── api/          # HTTP client, auth interceptors

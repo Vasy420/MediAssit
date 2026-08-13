@@ -37,14 +37,24 @@ export interface Appointment {
   is_fake?: boolean;
 }
 
+export interface UrgencyGuidance {
+  level: string;
+  label: string;
+  action: string;
+}
+
 export interface QueueEntry {
   queue_id: string;
+  queue_token?: string;
   patient_id: string;
   doctor_id: string;
+  appointment_id?: string;
   position?: number;
   status: 'waiting' | 'called' | 'in_consultation' | 'completed' | 'cancelled';
   estimated_wait_minutes?: number;
   waiting_time?: number;
+  urgency?: string;
+  priority_guidance?: UrgencyGuidance;
   appointment_time?: string;
   appointment_date?: string;
   appointment?: { time?: string; date?: string } | null;
@@ -94,17 +104,42 @@ export interface TriageResult {
 export type ChatTurn = TriageQuestion | TriageResult;
 
 export interface PreConsultSummary {
-  pc_id: string;
-  appointment_id: string;
+  pc_id?: string;
+  appointment_id?: string;
   chief_complaint: string;
-  symptoms: { duration: string; severity: string }[];
+  symptoms: { duration: string; severity: string; associated?: string }[];
   medications: string[];
   allergies: string[];
   medical_history: string;
   lifestyle_notes: string;
   vital_signs: Record<string, string>;
   triage_context: Record<string, unknown>;
-  status: 'in_progress' | 'completed';
+  clinical_summary?: string;
+  urgency?: string;
+  status?: 'in_progress' | 'completed';
+}
+
+export interface AppNotification {
+  notification_id: string;
+  type: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+  read: boolean;
+  created_at: string;
+}
+
+export interface SlotRecommendation {
+  doctor_id: string;
+  doctor_name: string;
+  specialization: string;
+  date: string;
+  time: string;
+  estimated_wait_minutes: number;
+  score?: number;
+  reason?: string;
+  rating?: number;
+  experience_years?: number;
 }
 
 export interface DoctorDashboardData {
@@ -120,10 +155,26 @@ export interface DoctorDashboardData {
     status: string;
     queue_position: string | null;
     queue_status: string | null;
+    preconsult_status?: string | null;
+    chief_complaint?: string;
+    urgency_guidance?: UrgencyGuidance;
   }[];
   total_today: number;
   queue_length: number;
   urgency_breakdown: { red: number; orange: number; yellow: number; green: number };
+  urgency_guidance?: UrgencyGuidance[];
+}
+
+export interface DiagnosisAssist {
+  difficulty: 'routine' | 'complex' | string;
+  diagnoses: { name: string; confidence?: number; rationale?: string }[];
+  prescription?: { drug: string; dose?: string; notes?: string }[];
+  assist_points?: string[];
+  red_flags?: string[];
+  reasoning?: string;
+  disclaimer?: string;
+  generated_at?: string;
+  model_used?: string;
 }
 
 export interface ApiResponse<T = unknown> {

@@ -1,7 +1,7 @@
 import { StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSettings } from '../contexts/SettingsContext';
-import { radii, spacing, shadows } from './theme';
+import { isDarkTheme, radii, spacing, shadows } from './theme';
 
 interface CardProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
@@ -13,8 +13,8 @@ export function Card({ style, padded = true, children, ...props }: CardProps) {
   return (
     <BlurView
       {...props}
-      intensity={themeName === 'midnight' ? 30 : 18}
-      tint={themeName === 'midnight' ? 'dark' : 'light'}
+      intensity={isDarkTheme(themeName) ? 30 : 18}
+      tint={isDarkTheme(themeName) ? 'dark' : 'light'}
       style={[styles.card, { borderColor: theme.border }, style]}
     >
       <View style={[styles.glassOverlay, { backgroundColor: `${theme.surface}F0` }, padded && styles.padded]}>
@@ -31,6 +31,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadows,
   },
-  glassOverlay: { flex: 1 },
+  glassOverlay: { width: '100%' },
   padded: { padding: spacing.lg },
 });

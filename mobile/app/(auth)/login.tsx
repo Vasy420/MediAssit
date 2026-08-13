@@ -5,10 +5,12 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { api } from '../../src/api/client';
 import type { User } from '../../src/types';
 import { Button } from '../../src/ui/Button';
+import { FadeSlide, ScaleIn } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
 import { TextField } from '../../src/ui/TextField';
 import { PasswordField } from '../../src/ui/PasswordField';
-import { radii, roleThemes, spacing, typography } from '../../src/ui/theme';
+import { useSettings } from '../../src/contexts/SettingsContext';
+import { radii, spacing, typography } from '../../src/ui/theme';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -18,7 +20,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'patient' | 'doctor'>(initialRole);
   const [loading, setLoading] = useState(false);
-  const theme = roleThemes[role];
+  const { theme } = useSettings();
 
   useEffect(() => {
     if (routeRole === 'doctor' || routeRole === 'patient') setRole(routeRole);
@@ -51,11 +53,16 @@ export default function LoginScreen() {
     <Screen padded={false} style={{ backgroundColor: theme.background }}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
-        <View style={[styles.logo, { backgroundColor: theme.primary }]}><Text style={[styles.logoText, { color: theme.onPrimary }]}>M+</Text></View>
-        <Text style={[styles.title, { color: theme.ink }]}>MedAssist+</Text>
-        <Text style={[styles.subtitle, { color: theme.inkMuted }]}>Your AI Healthcare Companion</Text>
+        <ScaleIn>
+          <View style={[styles.logo, { backgroundColor: theme.primary }]}><Text style={[styles.logoText, { color: theme.onPrimary }]}>M+</Text></View>
+        </ScaleIn>
+        <FadeSlide delay={80}>
+          <Text style={[styles.title, { color: theme.ink }]}>MedAssist+</Text>
+          <Text style={[styles.subtitle, { color: theme.inkMuted }]}>Your AI Healthcare Companion</Text>
+        </FadeSlide>
       </View>
 
+      <FadeSlide delay={140}>
       <TextField
         label="Email or phone"
         placeholder="Email or Phone"
@@ -81,7 +88,9 @@ export default function LoginScreen() {
       </View>
 
       <Button
-        title={loading ? 'Logging in...' : 'Login'}
+        title={loading ? 'Logging in...' : 'Log in'}
+        icon="log-in-outline"
+        size="lg"
         themeOverride={theme}
         style={styles.button}
         onPress={handleLogin}
@@ -92,6 +101,7 @@ export default function LoginScreen() {
       <Link href={{ pathname: '/(auth)/register', params: { role } }} style={[styles.link, { color: theme.primary }]}>
         Don't have an account? Register
       </Link>
+      </FadeSlide>
       </ScrollView>
     </Screen>
   );
@@ -104,7 +114,7 @@ const styles = StyleSheet.create({
   logoText: { fontSize: 22, fontWeight: '800' },
   title: { ...typography.display },
   subtitle: { ...typography.body, marginTop: spacing.xs },
-  button: { marginTop: spacing.md },
+  button: { marginTop: spacing.md, width: '100%' },
   link: { textAlign: 'center', marginTop: spacing.xl, fontSize: 14, fontWeight: '600' },
   accountLabel: { ...typography.label, marginTop: spacing.lg, marginBottom: spacing.sm },
   roleRow: { flexDirection: 'row', gap: spacing.sm },

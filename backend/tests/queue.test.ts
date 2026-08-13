@@ -22,7 +22,7 @@ after(async () => {
 async function patientToken(email: string) {
   const res = await request(app())
     .post('/api/auth/register')
-    .send({ name: 'Q User', email, password: 'Secret@123' });
+    .send({ name: 'Q ' + email, email, password: 'Secret@123' });
   return { token: tokenFrom(res.body), patient: res.body.data.patient };
 }
 

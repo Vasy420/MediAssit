@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Alert, Pressable } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { api } from '../../src/api/client';
 import { useSettings } from '../../src/contexts/SettingsContext';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
+import { FadeSlide, ScaleIn } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
 import { colors, layout, radii, spacing, typography } from '../../src/ui/theme';
 
@@ -27,6 +28,7 @@ export default function DoctorProfileScreen() {
   const router = useRouter();
   const [doctor, setDoctor] = useState<DoctorProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingStatus, setSavingStatus] = useState(false);
 
   useFocusEffect(useCallback(() => {
     async function loadProfile() {
@@ -44,22 +46,39 @@ export default function DoctorProfileScreen() {
 
   const handleLogout = () => { void logout(); };
 
+  const setStatus = async (status: 'available' | 'busy' | 'offline') => {
+    setSavingStatus(true);
+    try {
+      const res = await api.patch<{ doctor: DoctorProfile }>('/api/doctors/me/status', { status });
+      setDoctor(res.data?.doctor ?? { ...doctor, status });
+    } catch (error) {
+      Alert.alert('Could not update status', (error as Error).message);
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   return (
     <Screen
       padded={false}
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <ScrollView contentContainerStyle={styles.content}>
-      <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-        <Text style={[styles.avatarText, { color: theme.onPrimary }]}>
-          {user?.name?.charAt(0)?.toUpperCase() ?? 'D'}
-        </Text>
-      </View>
-      <Text style={[styles.name, { color: theme.ink }]}>{user?.name ?? 'Doctor'}</Text>
-      <Text style={[styles.role, { color: theme.inkMuted }]}>Doctor</Text>
-      <Text style={[styles.email, { color: theme.inkMuted }]}>{user?.email ?? ''}</Text>
+      <ScaleIn>
+        <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
+          <Text style={[styles.avatarText, { color: theme.onPrimary }]}>
+            {user?.name?.charAt(0)?.toUpperCase() ?? 'D'}
+          </Text>
+        </View>
+      </ScaleIn>
+      <FadeSlide delay={80}>
+        <Text style={[styles.name, { color: theme.ink }]}>{user?.name ?? 'Doctor'}</Text>
+        <Text style={[styles.role, { color: theme.inkMuted }]}>Doctor</Text>
+        <Text style={[styles.email, { color: theme.inkMuted }]}>{user?.email ?? ''}</Text>
+      </FadeSlide>
 
       {loadingProfile ? <ActivityIndicator color={theme.primary} style={styles.profileLoader} /> : doctor ? (
+        <FadeSlide delay={160} style={{ alignSelf: 'stretch' }}>
         <Card style={styles.profileCard}>
           <Text style={[styles.sectionTitle, { color: theme.ink }]}>Professional profile</Text>
           <InfoRow label="Specialization" value={doctor.specialization} />
@@ -70,16 +89,34 @@ export default function DoctorProfileScreen() {
           <InfoRow label="Consultation fee" value={doctor.consultation_fee ? `₹${doctor.consultation_fee}` : undefined} />
           <InfoRow label="Room" value={doctor.room_number} />
           <InfoRow label="Status" value={doctor.status} />
+          <View style={[styles.statusRow, { borderColor: theme.border }]}>
+            {(['available', 'busy', 'offline'] as const).map((status) => {
+              const selected = doctor.status === status;
+              return (
+                <Pressable
+                  key={status}
+                  disabled={savingStatus}
+                  onPress={() => void setStatus(status)}
+                  style={[styles.statusSeg, selected && { backgroundColor: theme.primary }]}
+                >
+                  <Text style={[styles.statusSegText, { color: selected ? theme.onPrimary : theme.ink }]}>
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <Text style={[styles.scheduleTitle, { color: theme.ink }]}>Appointment times</Text>
           <ScheduleDisplay availability={doctor.availability ?? []} />
-          <Button title="Edit professional profile" variant="secondary" style={styles.editButton} onPress={() => router.push({ pathname: '/doctor-onboarding', params: { edit: 'true' } })} />
+          <Button title="Edit professional profile" icon="create-outline" variant="secondary" style={styles.editButton} onPress={() => router.push({ pathname: '/doctor-onboarding', params: { edit: 'true' } })} />
         </Card>
+        </FadeSlide>
       ) : null}
 
-      <View style={styles.section}>
-        <Button title="Settings" variant="secondary" style={styles.settingsBtn} onPress={() => router.push('/settings')} />
-        <Button title="Logout" variant="danger" style={styles.logoutBtn} onPress={handleLogout} />
-      </View>
+      <FadeSlide delay={240} style={styles.section}>
+        <Button title="Settings" icon="settings-outline" variant="secondary" style={styles.settingsBtn} onPress={() => router.push('/settings')} />
+        <Button title="Log out" icon="log-out-outline" variant="danger" style={styles.logoutBtn} onPress={handleLogout} />
+      </FadeSlide>
       </ScrollView>
     </Screen>
   );
@@ -125,6 +162,9 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel: { ...typography.caption, flex: 1 },
   infoValue: { ...typography.body, flex: 1, textAlign: 'right' },
+  statusRow: { flexDirection: 'row', marginTop: spacing.sm, borderWidth: 1, borderRadius: radii.md, overflow: 'hidden', minHeight: 48 },
+  statusSeg: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48 },
+  statusSegText: { ...typography.label, fontWeight: '700' },
   scheduleTitle: { ...typography.heading, marginTop: spacing.md, marginBottom: spacing.xs },
   scheduleGrid: { gap: spacing.sm },
   dayCard: { borderWidth: 1, borderRadius: radii.md, padding: spacing.sm, gap: spacing.xs },

@@ -13,6 +13,27 @@ const preConsultationSchema = new Schema({
   lifestyle_notes: { type: String, default: '' },
   vital_signs: { type: Schema.Types.Mixed, default: {} },
   triage_context: { type: Schema.Types.Mixed, default: {} },
+  clinical_summary: { type: String, default: '' },
+  urgency: { type: String, enum: ['green', 'yellow', 'orange', 'red', ''], default: '' },
+  answers: {
+    type: [
+      {
+        key: { type: String, required: true },
+        answer: { type: String, default: '' },
+        rephrased: { type: Boolean, default: false },
+      },
+    ],
+    default: [],
+  },
+  messages: {
+    type: [
+      {
+        role: { type: String, required: true },
+        text: { type: String, default: '' },
+      },
+    ],
+    default: [],
+  },
   status: { type: String, enum: ['in_progress', 'completed'], default: 'in_progress' },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },

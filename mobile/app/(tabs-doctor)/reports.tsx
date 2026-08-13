@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
 import { useSettings } from '../../src/contexts/SettingsContext';
 import { Button } from '../../src/ui/Button';
+import { FadeSlide, Stagger } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
 import { StatusBadge } from '../../src/ui/StatusBadge';
 import { TextField } from '../../src/ui/TextField';
@@ -126,22 +127,26 @@ export default function DoctorReportsScreen() {
   return (
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.content}>
+      <FadeSlide>
       <View style={styles.titleRow}>
         <View style={styles.titleGroup}>
           <Text style={styles.title}>My Reports</Text>
           {testMode && <StatusBadge label="Fake test data" tone="warning" />}
         </View>
-        <Button title="Add Report" style={styles.addButton} onPress={() => { setForm(EMPTY_FORM); setFormError(''); setFormVisible(true); }} />
+        <Button title="Add report" icon="add-outline" style={styles.addButton} onPress={() => { setForm(EMPTY_FORM); setFormError(''); setFormVisible(true); }} />
       </View>
+      </FadeSlide>
       {visibleReports.length === 0 ? (
+        <FadeSlide delay={80}>
         <View style={styles.emptyWrap}>
           <Ionicons name="document-text-outline" size={40} color={colors.inkSubtle} />
           <Text style={styles.emptyText}>No reports yet.</Text>
         </View>
+        </FadeSlide>
       ) : (
-        visibleReports.map((report) => (
+        visibleReports.map((report, index) => (
+          <Stagger key={report.report_id} index={index}>
           <Pressable
-            key={report.report_id}
             style={({ pressed }) => [styles.card, pressed && styles.pressed]}
             onPress={() => report.is_fake ? Alert.alert('Fake test data', 'This report is local demo data.') : router.push(`/reports/${report.report_id}`)}
           >
@@ -152,6 +157,7 @@ export default function DoctorReportsScreen() {
               <Text style={styles.symptoms}>Symptoms: {report.symptoms.join(', ')}</Text>
             )}
           </Pressable>
+          </Stagger>
         ))
       )}
     </ScrollView>
@@ -170,7 +176,7 @@ export default function DoctorReportsScreen() {
             <TextField label="Prescription" value={form.prescription} onChangeText={(value) => updateForm('prescription', value)} placeholder="Medication and dosage" multiline containerStyle={styles.field} />
             <TextField label="Follow-up" value={form.followUp} onChangeText={(value) => updateForm('followUp', value)} placeholder="Follow-up instructions" multiline containerStyle={styles.field} />
             {formError ? <Text style={[styles.formError, { color: theme.danger }]}>{formError}</Text> : null}
-            <Button title="Save Report" onPress={handleCreateReport} loading={saving} disabled={saving} />
+            <Button title="Save report" icon="save-outline" size="lg" onPress={handleCreateReport} loading={saving} disabled={saving} />
             <Button title="Cancel" variant="ghost" onPress={() => setFormVisible(false)} disabled={saving} />
           </ScrollView>
         </View>
@@ -185,7 +191,7 @@ const styles = StyleSheet.create({
   title: { ...typography.title, color: colors.ink, marginBottom: spacing.lg },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.lg },
   titleGroup: { flex: 1, gap: spacing.xs },
-  addButton: { minWidth: 112 },
+  addButton: { minWidth: 132 },
   emptyText: { ...typography.body, color: colors.inkSubtle, textAlign: 'center', marginTop: spacing.md },
   emptyWrap: { alignItems: 'center', gap: spacing.md, marginTop: 48 },
   card: { marginBottom: spacing.md },

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -8,6 +8,7 @@ import { fakeDoctorDashboard } from '../../src/data/testData';
 import { useSettings } from '../../src/contexts/SettingsContext';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
+import { FadeSlide, Stagger } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
 import { StatusBadge } from '../../src/ui/StatusBadge';
 import { colors, layout, spacing, typography } from '../../src/ui/theme';
@@ -26,6 +27,9 @@ interface DashboardData {
     status: string;
     queue_position: string | null;
     queue_status: string | null;
+    preconsult_status?: string | null;
+    chief_complaint?: string;
+    urgency_guidance?: { level: string; label: string; action: string };
   }[];
   total_today: number;
   queue_length: number;
@@ -34,7 +38,7 @@ interface DashboardData {
 
 export default function DoctorDashboardScreen() {
   const { user } = useAuth();
-  const { testMode, fakeQueue } = useSettings();
+  const { testMode, theme, fakeQueue } = useSettings();
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,32 +82,40 @@ export default function DoctorDashboardScreen() {
     void load();
   }, [load, testMode]));
 
-  if (loading) return <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />;
+  if (loading) return <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 60 }} />;
 
   return (
     <Screen padded={false}>
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.greetingRow}>
-        <Text style={styles.greeting}>Welcome, Dr. {user?.name ?? ''}</Text>
-        {testMode && <StatusBadge label="Fake test data" tone="warning" />}
-      </View>
+      <FadeSlide>
+        <View style={styles.greetingRow}>
+          <Text style={[styles.greeting, { color: theme.ink }]}>Welcome, Dr. {user?.name ?? ''}</Text>
+          {testMode && <StatusBadge label="Fake test data" tone="warning" />}
+        </View>
+      </FadeSlide>
       {displayData && (
         <>
+          <FadeSlide delay={80}>
           <View style={styles.statsRow}>
             <Card style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: colors.primarySoft }]}><Ionicons name="calendar" size={16} color={colors.primary} /></View>
-              <Text style={styles.statNum}>{displayData.total_today}</Text>
-              <Text style={styles.statLabel}>Upcoming Appointments</Text>
+              <View style={[styles.statIcon, { backgroundColor: theme.primarySoft }]}><Ionicons name="calendar" size={16} color={theme.primary} /></View>
+              <Text style={[styles.statNum, { color: theme.primary }]}>{displayData.total_today}</Text>
+              <Text style={[styles.statLabel, { color: theme.inkMuted }]}>Upcoming Appointments</Text>
             </Card>
             <Card style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: colors.warningSoft }]}><Ionicons name="people" size={16} color={colors.warning} /></View>
-              <Text style={styles.statNum}>{displayData.queue_length}</Text>
-              <Text style={styles.statLabel}>In Queue</Text>
+              <View style={[styles.statIcon, { backgroundColor: theme.warningSoft }]}><Ionicons name="people" size={16} color={theme.warning} /></View>
+              <Text style={[styles.statNum, { color: theme.primary }]}>{displayData.queue_length}</Text>
+              <Text style={[styles.statLabel, { color: theme.inkMuted }]}>In Queue</Text>
             </Card>
           </View>
+          </FadeSlide>
 
+          <FadeSlide delay={160}>
           <Card style={styles.urgencyRow}>
-            <Text style={styles.sectionTitle}>Urgency Breakdown</Text>
+            <Text style={[styles.sectionTitle, { color: theme.ink }]}>AI urgency guidance</Text>
+            <Text style={[styles.emptyText, { textAlign: 'left', marginTop: 0, marginBottom: spacing.sm }]}>
+              Queue order follows pre-consultation severity: red first, then orange, yellow, and routine green visits.
+            </Text>
             <View style={styles.urgencyBar}>
               {(['red', 'orange', 'yellow', 'green'] as const).map((level) => (
                 <View key={level} style={styles.urgencyItem}>
@@ -115,38 +127,47 @@ export default function DoctorDashboardScreen() {
               ))}
             </View>
           </Card>
+          </FadeSlide>
 
-          <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
+          <FadeSlide delay={220}>
+          <Text style={[styles.sectionTitle, { color: theme.ink }]}>Upcoming Appointments</Text>
+          </FadeSlide>
           {displayData.today_appointments.length === 0 ? (
-            <Text style={styles.emptyText}>No appointments scheduled for today.</Text>
+            <Text style={[styles.emptyText, { color: theme.inkSubtle }]}>No appointments scheduled for today.</Text>
           ) : (
-            displayData.today_appointments.map((appt) => (
+            displayData.today_appointments.map((appt, index) => (
+              <Stagger key={appt.appointment_id} index={index}>
               <Pressable
-                key={appt.appointment_id}
-                style={({ pressed }) => [styles.apptCard, pressed && styles.pressed]}
-                onPress={() => appt.appointment_id.startsWith('FAKE-') ? Alert.alert('Fake test data', 'This dashboard appointment is local demo data.') : router.push('/(tabs-doctor)/queue')}
+                style={({ pressed }) => [styles.apptCard, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}
+                onPress={() => router.push(`/doctor/consultation/${appt.appointment_id}`)}
               >
                 <View style={styles.apptHeader}>
-                  <Text style={styles.apptPatient}>{appt.patient_name}</Text>
+                  <Text style={[styles.apptPatient, { color: theme.ink }]}>{appt.patient_name}</Text>
                   <StatusBadge label={appt.urgency} tone={appt.urgency === 'red' ? 'danger' : appt.urgency === 'orange' || appt.urgency === 'yellow' ? 'warning' : 'success'} />
                 </View>
-                <Text style={styles.apptTime}>Time: {appt.time}</Text>
-                <Text style={styles.apptDate}>Date: {new Date(`${appt.date}T00:00:00`).toLocaleDateString()}</Text>
-                <Text style={styles.apptStatus}>Status: {appt.status.replace(/_/g, ' ')}</Text>
+                <Text style={[styles.apptTime, { color: theme.inkMuted }]}>Time: {appt.time}</Text>
+                <Text style={[styles.apptDate, { color: theme.inkMuted }]}>Date: {new Date(`${appt.date}T00:00:00`).toLocaleDateString()}</Text>
+                <Text style={[styles.apptStatus, { color: theme.inkMuted }]}>Status: {appt.status.replace(/_/g, ' ')}</Text>
+                {appt.chief_complaint ? <Text style={[styles.apptStatus, { color: theme.inkMuted }]}>Complaint: {appt.chief_complaint}</Text> : null}
+                {appt.urgency_guidance?.action ? <Text style={[styles.apptQueue, { color: theme.primary }]}>{appt.urgency_guidance.action}</Text> : null}
+                {appt.preconsult_status ? <Text style={[styles.apptQueue, { color: theme.primary }]}>Pre-consult: {appt.preconsult_status.replace(/_/g, ' ')}</Text> : null}
                 {appt.queue_position && (
-                  <Text style={styles.apptQueue}>Queue: {appt.queue_position} ({appt.queue_status})</Text>
+                  <Text style={[styles.apptQueue, { color: theme.primary }]}>Queue: {appt.queue_position} ({appt.queue_status})</Text>
                 )}
               </Pressable>
+              </Stagger>
             ))
           )}
 
-          <Button title="Manage Queue" style={styles.manageQueueBtn} onPress={() => router.push('/(tabs-doctor)/queue')} />
+          <FadeSlide delay={280}>
+            <Button title="Manage queue" icon="list-outline" size="lg" style={styles.manageQueueBtn} onPress={() => router.push('/(tabs-doctor)/queue')} />
+          </FadeSlide>
         </>
       )}
       {!displayData && (
         <Card style={styles.emptyCard}>
-          <Text style={styles.sectionTitle}>Dashboard is waiting for live data</Text>
-          <Text style={styles.emptyText}>Enable Test Mode in Settings to preview appointments, queue, patients, and reports.</Text>
+          <Text style={[styles.sectionTitle, { color: theme.ink }]}>Dashboard is waiting for live data</Text>
+          <Text style={[styles.emptyText, { color: theme.inkSubtle }]}>Enable Test Mode in Settings to preview appointments, queue, patients, and reports.</Text>
           <Button title="Open Settings" variant="secondary" onPress={() => router.push('/settings')} />
         </Card>
       )}

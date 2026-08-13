@@ -21,6 +21,7 @@ class PatientContext(BaseModel):
     age: Optional[int] = None
     gender: Optional[str] = None
     existing_conditions: Optional[list[str]] = None
+    allergies: Optional[list[str]] = None
 
 
 class ChatRequest(BaseModel):
