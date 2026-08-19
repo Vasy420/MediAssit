@@ -14,6 +14,10 @@ import { patientRouter } from './routes/patients.js';
 import { preconsultRouter } from './routes/preconsult.js';
 import { doctorDashboardRouter } from './routes/doctorDashboard.js';
 import { slotRouter } from './routes/slotRecommendation.js';
+import { prescriptionRouter } from './routes/prescriptions.js';
+import { familyRouter } from './routes/family.js';
+import { timelineRouter } from './routes/timeline.js';
+import { scanRouter } from './routes/scan.js';
 
 export function createApp(): Express {
   const app = express();
@@ -26,7 +30,7 @@ export function createApp(): Express {
       credentials: true,
     }),
   );
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '12mb' }));
 
   const limiter = rateLimit({
     windowMs: env.rateLimitWindowMs,
@@ -51,6 +55,10 @@ export function createApp(): Express {
   app.use('/api/preconsult', preconsultRouter);
   app.use('/api/doctor-dashboard', doctorDashboardRouter);
   app.use('/api/slots', slotRouter);
+  app.use('/api/prescriptions', prescriptionRouter);
+  app.use('/api/family', familyRouter);
+  app.use('/api/timeline', timelineRouter);
+  app.use('/api/scan', scanRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { api } from '../../src/api/client';
 import { useSettings } from '../../src/contexts/SettingsContext';
@@ -12,6 +12,7 @@ import { colors, layout, spacing, typography } from '../../src/ui/theme';
 
 interface QueueEntry {
   queue_id: string;
+  appointment_id: string;
   patient_id: string;
   patient?: { name: string; age?: number };
   appointment_time?: string;
@@ -25,6 +26,7 @@ interface QueueEntry {
 
 export default function DoctorQueueScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const { testMode, fakeQueue, updateFakeQueueStatus } = useSettings();
   const [entries, setEntries] = useState<QueueEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,6 +101,14 @@ export default function DoctorQueueScreen() {
     }
   };
 
+  const handleWritePrescription = (entry: QueueEntry) => {
+    if (entry.is_fake || !entry.appointment_id) {
+      Alert.alert('Demo only', 'Prescriptions need a real completed appointment.');
+      return;
+    }
+    router.push(`/prescriptions/new?appointmentId=${entry.appointment_id}&patientId=${entry.patient_id}`);
+  };
+
   const handleStartConsultation = async (queueId: string) => {
     if (queueId.startsWith('FAKE-')) {
       updateFakeQueueStatus(queueId, 'in_consultation');
@@ -146,6 +156,9 @@ export default function DoctorQueueScreen() {
               <View style={styles.actionRow}>
                 {entry.status === 'called' && (
                   <Button title="Start Consultation" style={styles.actionBtn} onPress={() => handleStartConsultation(entry.queue_id)} />
+                )}
+                {entry.status === 'in_consultation' && (
+                  <Button title="Write Prescription" variant="secondary" style={styles.actionBtn} onPress={() => handleWritePrescription(entry)} />
                 )}
                 <Button title="Complete" variant="success" style={styles.completeBtn} onPress={() => handleComplete(entry.queue_id)} />
               </View>

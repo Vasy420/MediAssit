@@ -29,11 +29,15 @@ AI-powered healthcare navigation and management platform. Streamlines patient tr
 
 ## Features
 
-- **Symptom Triage Chat** — Multi-turn AI conversation to assess symptoms and determine urgency level
+- **Symptom Triage Chat** — Multi-turn AI conversation to assess symptoms and determine urgency level (voice input + read-aloud supported)
 - **Doctor Discovery** — Browse and search doctors by specialization
 - **Appointment Management** — Book, view, and cancel appointments
-- **Priority Queue** — Urgency-weighted triage queue with doctor calling and manual override
+- **Priority Queue** — Urgency-weighted triage queue with doctor calling, manual override, and live position/ETA via WebSocket
 - **Medical Reports** — Upload reports and get AI-generated plain-language summaries
+- **Report OCR Scan** — Photograph a paper report; tesseract.js extracts the text and the AI writes a plain-language summary
+- **Prescriptions & Follow-ups** — Doctors write structured prescriptions (medication, dosage, frequency, follow-up date) after a consultation; patients get a digital copy + push notification
+- **Health Timeline** — Every appointment, report, prescription, pre-consultation, and triage in one chronological journal
+- **Family & Guardian Mode** — Link family accounts (parent/child/spouse/sibling) and view their health records
 - **Push Notifications** — Expo push notifications for queue updates and doctor calls
 - **Auth** — JWT-based registration, login, and role-based access (patient/doctor/admin)
 
@@ -157,6 +161,37 @@ Opens Expo dev tools. Press `w` for web, scan QR for mobile (Expo Go app).
 | PATCH | `/api/queue/:id` | Update queue status (doctor/admin) |
 | PATCH | `/api/queue/:id/override` | Override priority score (doctor/admin) |
 
+Live updates: subscribe to Socket.IO room `queue:<queue_id>` (`queue:subscribe`/`queue:unsubscribe` events), receive `queue:update` events with position/ETA/status.
+
+### Prescriptions
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/prescriptions` | Create prescription (doctor) |
+| GET | `/api/prescriptions/me` | List own prescriptions |
+| GET | `/api/prescriptions/patient/:patientId` | List a patient's prescriptions |
+| GET | `/api/prescriptions/doctor` | List doctor's prescriptions |
+| GET | `/api/prescriptions/:id` | Get prescription + doctor info |
+
+### Health Timeline
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/timeline/me` | Own chronological health journal |
+| GET | `/api/timeline/patient/:patientId` | Patient timeline (self, doctor, or linked guardian) |
+
+### Family
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/family` | List linked family members |
+| POST | `/api/family` | Link member by email (relation: parent/child/spouse/sibling/other) |
+| DELETE | `/api/family/:userId` | Unlink family member |
+
+### Report OCR Scan
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/scan` | Upload `image_base64`, get extracted text + AI summary |
+| GET | `/api/scan/list` | List own scans |
+| GET | `/api/scan/:id` | Get scan details |
+
 ### Medical Reports
 | Method | Path | Description |
 |--------|------|-------------|
@@ -191,7 +226,7 @@ mediassist/
 │   │   ├── middleware/    # Auth, validation, error handling
 │   │   ├── models/       # Mongoose schemas
 │   │   ├── routes/       # Express routers
-│   │   ├── services/     # Business logic, AI client, notifications
+│   │   ├── services/     # Business logic, AI client, notifications, realtime
 │   │   ├── seed/         # Database seeder
 │   │   └── utils/        # Helpers (idGen, logger, errors)
 │   └── tests/
@@ -199,11 +234,15 @@ mediassist/
 │   ├── app/
 │   │   ├── (auth)/       # Login & register screens
 │   │   ├── (tabs)/       # Home, AI chat, doctors, appointments, profile
-│   │   ├── reports/      # Medical report detail screen
-│   │   └── queue/        # Queue status screen
+│   │   ├── reports/      # Medical report detail + OCR scan screens
+│   │   ├── prescriptions/ # Prescription list, detail, doctor write screen
+│   │   ├── queue/        # Queue status screen (live WebSocket updates)
+│   │   ├── timeline.tsx  # Health timeline journal
+│   │   └── family.tsx    # Family & guardian links
 │   └── src/
-│       ├── api/          # HTTP client, auth interceptors
+│       ├── api/          # HTTP client, auth interceptors, socket.io client
 │       ├── contexts/     # Auth provider
+│       ├── services/     # Voice input (speech recognition + TTS)
 │       └── types/        # TypeScript type definitions
 └── README.md
 ```

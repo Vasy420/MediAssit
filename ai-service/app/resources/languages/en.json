@@ -1,6 +1,17 @@
 {
   "disclaimer": "This is AI-assisted guidance, not a medical diagnosis. Always consult a qualified healthcare professional.",
   "category_question": "What problem are you having?",
+  "category_question_simple": "Tap the picture that is closest to your problem. If none fits, tap \"I don't know\".",
+  "not_sure_simple": "I don't know",
+  "category_fallback_question": "Can you tell us a little more? Which of these is closest to your problem?",
+  "category_fallback_question_simple": "Tap the picture that is closest to your problem. Or tap \"I don't know\".",
+  "category_fallback_option": {
+    "fever": "Fever",
+    "cough": "Cough or cold",
+    "stomach_pain": "Stomach pain",
+    "body_pain": "Body pain or injury",
+    "skin_problem": "Skin problem"
+  },
   "category_label": {
     "fever": "Fever",
     "stomach": "Stomach problem",
@@ -106,7 +117,14 @@
     "orange": "Your symptoms should be evaluated by a healthcare professional promptly.",
     "red": "Your symptoms may require immediate medical attention. Please seek emergency medical care now."
   },
+  "reason_simple": {
+    "green": "No hurry. You can see a doctor when it is convenient for you.",
+    "yellow": "See a doctor in the next day or two.",
+    "orange": "See a doctor today. Do not wait long.",
+    "red": "Go to a hospital right now. This is an emergency. Do not wait."
+  },
   "fallback_reason": "Since we could not identify a specific problem, we recommend starting with a general physician who can guide you further.",
+  "fallback_reason_simple": "See a general doctor (family doctor). They will check you and tell you what to do.",
   "questions": {
     "fever": [
       { "id": "Q_fever_severity", "prompt": "How bad do you feel with the fever?", "simple": "How bad is it? A little, medium or very bad?", "options": ["little", "medium", "severe"] },

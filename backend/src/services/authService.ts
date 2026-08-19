@@ -47,9 +47,6 @@ export async function register(input: RegisterInput) {
   const existingEmail = await User.findOne({ email }).lean();
   if (existingEmail) throw Errors.conflict('Email already exists');
 
-  const existingUsername = await User.findOne({ name: new RegExp(`^${escapeRegExp(name)}$`, 'i') }).lean();
-  if (existingUsername) throw Errors.conflict('Account already exists with same username');
-
   if (phone) {
     const existingPhone = await User.findOne({ phone }).lean();
     if (existingPhone) throw Errors.conflict('Phone number already exists');
@@ -71,7 +68,7 @@ export async function register(input: RegisterInput) {
     patient = await Patient.create({
       patient_id: await nextId('P'),
       user_id,
-       name,
+      name,
       age: input.age,
       gender: (input.gender ?? '') as '' | 'male' | 'female' | 'other',
     });
@@ -79,10 +76,6 @@ export async function register(input: RegisterInput) {
 
   logger.audit('auth-register', { user_id, role });
   return { user: await publicUser(user_id), patient, token: signToken(user) };
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export async function login(input: LoginInput) {

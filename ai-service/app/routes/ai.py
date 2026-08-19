@@ -15,6 +15,7 @@ def _run_turn(req: ChatRequest) -> dict:
         messages=[{'role': m.role, 'text': m.text} for m in req.messages],
         answers=[{'key': a.key, 'answer': a.answer, 'rephrased': a.rephrased} for a in req.answers],
         patient=patient,
+        simple=req.simple,
     )
 
 

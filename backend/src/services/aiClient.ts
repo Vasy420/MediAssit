@@ -10,6 +10,7 @@ export interface AiChatPayload {
   patient_context?: { age?: number | null; gender?: string | null; existing_conditions?: string[] };
   messages: { role: string; text: string }[];
   answers: { key: string; answer: string; rephrased?: boolean }[];
+  simple?: boolean;
 }
 
 export interface AiSummaryResult {
@@ -75,6 +76,7 @@ export async function aiChat(payload: AiChatPayload): Promise<ChatTurn> {
       messages: payload.messages,
       answers: payload.answers,
       patient: payload.patient_context,
+      simple: payload.simple,
     });
   }
 }
@@ -89,6 +91,7 @@ export async function aiTriage(payload: Omit<AiChatPayload, 'conversation_id'>):
       messages: payload.messages,
       answers: payload.answers,
       patient: payload.patient_context,
+      simple: payload.simple,
     });
   }
 }

@@ -2,12 +2,35 @@ import { Appointment } from '../models/Appointment.js';
 import { Patient } from '../models/Patient.js';
 import { notify } from './notificationService.js';
 import { getDoctor } from './doctorService.js';
+import { listDoctorQueue, AVG_CONSULT_MINUTES } from './queueAgent.js';
+import { emitQueueUpdate } from './realtimeService.js';
 import { logger } from '../utils/logger.js';
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
+let queueTickId: ReturnType<typeof setInterval> | null = null;
 
 export function startScheduler(intervalMinutes = 30) {
   if (intervalId) return;
+
+  queueTickId = setInterval(async () => {
+    try {
+      const queues = await listActiveQueues();
+      const doctorIds = [...new Set(queues.map((q) => q.doctor_id))];
+      for (const doctorId of doctorIds) {
+        const rows = await listDoctorQueue(doctorId);
+        for (const row of rows) {
+          emitQueueUpdate(row.queue_id, {
+            queue_id: row.queue_id,
+            position: row.position,
+            waiting_time: row.waiting_time,
+            status: row.status,
+          });
+        }
+      }
+    } catch (err) {
+      logger.warn('Queue broadcast tick error: ' + (err as Error).message);
+    }
+  }, 30 * 1000);
 
   intervalId = setInterval(async () => {
     try {
@@ -50,4 +73,13 @@ export function stopScheduler() {
     clearInterval(intervalId);
     intervalId = null;
   }
+  if (queueTickId) {
+    clearInterval(queueTickId);
+    queueTickId = null;
+  }
+}
+
+async function listActiveQueues() {
+  const { Queue } = await import('../models/Queue.js');
+  return Queue.find({ status: { $in: ['waiting', 'called', 'in_consultation'] } }).lean();
 }

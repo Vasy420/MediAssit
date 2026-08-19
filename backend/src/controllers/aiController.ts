@@ -23,10 +23,12 @@ export async function handleChat(req: Request, res: Response) {
     conversation_id?: string;
     message?: string;
     answers?: { key: string; answer: string; rephrased?: boolean; question?: string }[];
+    simple?: boolean;
   };
   const conversation_id = body.conversation_id ?? '';
   const message = (body.message ?? '').toString();
   const bodyAnswers = body.answers ?? [];
+  const simple = body.simple === true;
 
   let conversation = conversation_id
     ? await getConversation(conversation_id)
@@ -72,6 +74,7 @@ export async function handleChat(req: Request, res: Response) {
     },
     messages,
     answers,
+    simple,
   });
 
   if (turn.type === 'result') {
@@ -98,11 +101,13 @@ export async function handleTriage(req: Request, res: Response) {
       gender?: string | null;
       existing_conditions?: string[];
     };
+    simple?: boolean;
   };
   const turn = await aiTriage({
     messages: data.messages ?? [],
     answers: data.answers ?? [],
     patient_context: data.patient_context ?? undefined,
+    simple: data.simple === true,
   });
   res.json({ success: true, data: turn });
 }

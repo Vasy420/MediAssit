@@ -29,6 +29,7 @@ class ChatRequest(BaseModel):
     patient_context: Optional[PatientContext] = None
     messages: list[Message] = Field(default_factory=list)
     answers: list[Answer] = Field(default_factory=list)
+    simple: bool = False
 
 
 class SummaryRequest(BaseModel):

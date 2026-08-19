@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { api } from '../../src/api/client';
+import { subscribeQueue } from '../../src/api/socket';
 import type { QueueEntry } from '../../src/types';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
@@ -14,6 +15,7 @@ export default function QueueScreen() {
   const isFake = id.startsWith('FAKE-');
   const [entry, setEntry] = useState<QueueEntry | null>(null);
   const [loading, setLoading] = useState(true);
+  const [live, setLive] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function loadEntry() {
@@ -31,8 +33,25 @@ export default function QueueScreen() {
 
   useEffect(() => {
     loadEntry().finally(() => setLoading(false));
-    if (!isFake) timerRef.current = setInterval(loadEntry, 15000);
+    if (isFake) return;
+
+    const unsubscribe = subscribeQueue(id, (update) => {
+      setLive(true);
+      setEntry((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          position: update.position ?? prev.position,
+          waiting_time: update.waiting_time ?? prev.waiting_time,
+          estimated_wait_minutes: update.eta_minutes ?? update.waiting_time ?? prev.estimated_wait_minutes,
+          status: (update.status as QueueEntry['status']) ?? prev.status,
+        };
+      });
+    });
+
+    timerRef.current = setInterval(loadEntry, 20000);
     return () => {
+      unsubscribe();
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [id, isFake]);
@@ -97,7 +116,9 @@ export default function QueueScreen() {
           </View>
         )}
         {entry.status === 'waiting' && (
-          <Text style={styles.hint}>You will be notified when the doctor calls you.</Text>
+          <Text style={styles.hint}>
+            {live ? 'Live position updates enabled.' : 'You will be notified when the doctor calls you.'}
+          </Text>
         )}
       </Card>
 
