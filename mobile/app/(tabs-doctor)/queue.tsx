@@ -1,18 +1,19 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useAuth } from '../../src/contexts/AuthContext';
 import { api } from '../../src/api/client';
 import { useSettings } from '../../src/contexts/SettingsContext';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
+import { FadeSlide, Stagger } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
 import { StatusBadge } from '../../src/ui/StatusBadge';
 import { colors, layout, spacing, typography } from '../../src/ui/theme';
 
 interface QueueEntry {
   queue_id: string;
-  appointment_id: string;
+  queue_token?: string;
+  appointment_id?: string;
   patient_id: string;
   patient?: { name: string; age?: number };
   appointment_time?: string;
@@ -22,10 +23,10 @@ interface QueueEntry {
   status: string;
   waiting_time: number;
   is_fake?: boolean;
+  priority_guidance?: { label: string; action: string };
 }
 
 export default function DoctorQueueScreen() {
-  const { user } = useAuth();
   const router = useRouter();
   const { testMode, fakeQueue, updateFakeQueueStatus } = useSettings();
   const [entries, setEntries] = useState<QueueEntry[]>([]);
@@ -109,14 +110,16 @@ export default function DoctorQueueScreen() {
     router.push(`/prescriptions/new?appointmentId=${entry.appointment_id}&patientId=${entry.patient_id}`);
   };
 
-  const handleStartConsultation = async (queueId: string) => {
-    if (queueId.startsWith('FAKE-')) {
-      updateFakeQueueStatus(queueId, 'in_consultation');
+  const handleStartConsultation = async (entry: QueueEntry) => {
+    if (entry.queue_id.startsWith('FAKE-')) {
+      updateFakeQueueStatus(entry.queue_id, 'in_consultation');
+      router.push(`/doctor/consultation/${entry.appointment_id || 'FAKE-APPT-101'}`);
       return;
     }
     try {
-      await api.patch(`/api/queue/${queueId}`, { status: 'in_consultation' });
-      loadQueue();
+      await api.patch(`/api/queue/${entry.queue_id}`, { status: 'in_consultation' });
+      await loadQueue();
+      if (entry.appointment_id) router.push(`/doctor/consultation/${entry.appointment_id}`);
     } catch (e) {
       Alert.alert('Error', (e as Error).message);
     }
@@ -131,38 +134,46 @@ export default function DoctorQueueScreen() {
   return (
     <Screen padded={false}>
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.headerRow}>
-        <View style={styles.titleGroup}>
-          <Text style={styles.title}>Queue ({visibleEntries.length})</Text>
-          {testMode && <StatusBadge label="Fake test data" tone="warning" />}
+      <FadeSlide>
+        <View style={styles.headerRow}>
+          <View style={styles.titleGroup}>
+            <Text style={styles.title}>Queue ({visibleEntries.length})</Text>
+            {testMode && <StatusBadge label="Fake test data" tone="warning" />}
+          </View>
         </View>
-        {waiting.length > 0 && (
-          <Button title="Call Next" variant="success" style={styles.callNextBtn} onPress={handleCallNext} />
-        )}
-      </View>
+      </FadeSlide>
+      {waiting.length > 0 && (
+        <FadeSlide delay={80}>
+          <Button title="Call next patient" icon="megaphone-outline" variant="success" size="lg" style={styles.callNextBtn} onPress={handleCallNext} />
+        </FadeSlide>
+      )}
 
       {active.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Active</Text>
-          {active.map((entry) => (
-            <Card key={entry.queue_id} style={styles.card}>
+          {active.map((entry, index) => (
+            <Stagger key={entry.queue_id} index={index} style={styles.card}>
+            <Card>
               <View style={styles.cardHeader}>
                 <Text style={styles.patientName}>{entry.patient?.name ?? entry.patient_id}</Text>
                 <StatusBadge label={entry.status === 'called' ? 'Called' : 'In Consultation'} tone="warning" />
               </View>
+              <Text style={styles.detail}>Token: {entry.queue_token || entry.queue_id}</Text>
               <Text style={styles.detail}>Position: #{entry.position}</Text>
               <Text style={[styles.detail, { color: severityColor(entry.urgency) }]}>Urgency: {entry.urgency.toUpperCase()}</Text>
+              {entry.priority_guidance?.action ? <Text style={styles.detail}>{entry.priority_guidance.action}</Text> : null}
               {entry.appointment_time && <Text style={styles.detail}>Appointment: {entry.appointment_time}</Text>}
               <View style={styles.actionRow}>
                 {entry.status === 'called' && (
-                  <Button title="Start Consultation" style={styles.actionBtn} onPress={() => handleStartConsultation(entry.queue_id)} />
+                  <Button title="Start consult" icon="play-outline" style={styles.actionBtn} onPress={() => handleStartConsultation(entry)} />
                 )}
                 {entry.status === 'in_consultation' && (
-                  <Button title="Write Prescription" variant="secondary" style={styles.actionBtn} onPress={() => handleWritePrescription(entry)} />
+                  <Button title="Write Rx" icon="create-outline" variant="secondary" style={styles.actionBtn} onPress={() => handleWritePrescription(entry)} />
                 )}
-                <Button title="Complete" variant="success" style={styles.completeBtn} onPress={() => handleComplete(entry.queue_id)} />
+                <Button title="Complete" icon="checkmark-outline" variant="secondary" style={styles.completeBtn} onPress={() => handleComplete(entry.queue_id)} />
               </View>
             </Card>
+            </Stagger>
           ))}
         </View>
       )}
@@ -173,15 +184,19 @@ export default function DoctorQueueScreen() {
           <Text style={styles.emptyText}>No patients waiting.</Text>
         ) : (
           waiting.map((entry, i) => (
-            <Card key={entry.queue_id} style={styles.card}>
+            <Stagger key={entry.queue_id} index={i} style={styles.card}>
+            <Card>
               <View style={styles.cardHeader}>
                 <Text style={styles.patientName}>{entry.patient?.name ?? entry.patient_id}</Text>
                 <Text style={[styles.urgencyText, { color: severityColor(entry.urgency) }]}>{entry.urgency.toUpperCase()}</Text>
               </View>
+              <Text style={styles.detail}>Token: {entry.queue_token || entry.queue_id}</Text>
               <Text style={styles.detail}>Position: #{entry.position}</Text>
               <Text style={styles.detail}>Est. wait: ~{entry.waiting_time} min</Text>
+              {entry.priority_guidance?.action ? <Text style={styles.detail}>{entry.priority_guidance.action}</Text> : null}
               {entry.appointment_time && <Text style={styles.detail}>Appointment: {entry.appointment_time}</Text>}
             </Card>
+            </Stagger>
           ))
         )}
       </View>
@@ -204,7 +219,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xl },
   title: { ...typography.title, color: colors.ink },
   titleGroup: { gap: spacing.xs },
-  callNextBtn: { minWidth: 112 },
+  callNextBtn: { width: '100%', marginBottom: spacing.xl },
   section: { marginBottom: spacing.xxl },
   sectionTitle: { ...typography.heading, color: colors.inkMuted, marginBottom: spacing.md },
   card: { marginBottom: spacing.sm },

@@ -7,7 +7,7 @@ import { extractiveSummary } from './reportSummarizer.js';
 export interface AiChatPayload {
   conversation_id?: string;
   patient_id?: string;
-  patient_context?: { age?: number | null; gender?: string | null; existing_conditions?: string[] };
+  patient_context?: { age?: number | null; gender?: string | null; existing_conditions?: string[]; allergies?: string[] };
   messages: { role: string; text: string }[];
   answers: { key: string; answer: string; rephrased?: boolean }[];
   simple?: boolean;
@@ -122,7 +122,7 @@ export interface PreConsultPayload {
   patient_id?: string;
   appointment_id?: string;
   triage_context?: Record<string, unknown>;
-  patient_context?: { age?: number | null; gender?: string | null; existing_conditions?: string[] };
+  patient_context?: { age?: number | null; gender?: string | null; existing_conditions?: string[]; allergies?: string[] };
   messages: { role: string; text: string }[];
   answers: { key: string; answer: string; rephrased?: boolean }[];
 }
@@ -187,12 +187,14 @@ function fallbackPreConsult(payload: PreConsultPayload): PreConsultTurn {
     done: true,
     preconsult_summary: {
       chief_complaint: patientText || 'General consultation',
-      symptoms: payload.answers.map((answer) => answer.answer),
+      symptoms: payload.answers.map((answer) => ({ duration: 'Not reported', severity: answer.answer, associated: '' })),
       medications: [],
-      allergies: [],
-      medical_history: '',
+      allergies: payload.patient_context?.allergies ?? [],
+      medical_history: (payload.patient_context?.existing_conditions ?? []).join(', '),
       lifestyle_notes: '',
       vital_signs: {},
+      clinical_summary: patientText || 'General consultation. Offline pre-consultation fallback was used.',
+      urgency: 'green',
       triage_context: { source: 'local-preconsult-fallback', answers: payload.answers },
     },
   };
@@ -219,8 +221,48 @@ export interface SlotRecommendPayload {
     time: string;
     consultation_fee: number;
     rating: number;
+    experience_years?: number;
     estimated_wait_minutes: number;
   }[];
+}
+
+export interface DiagnosePayload {
+  patient: Record<string, unknown>;
+  preconsult_summary: Record<string, unknown>;
+  notes: Record<string, unknown>[];
+  reason?: string;
+  urgency?: string;
+}
+
+function fallbackDiagnose(payload: DiagnosePayload): Record<string, unknown> {
+  const summary = payload.preconsult_summary || {};
+  const complaint = String(summary.chief_complaint || payload.reason || '').toLowerCase();
+  const urgency = String(summary.urgency || payload.urgency || 'green');
+  const complex = urgency === 'red' || urgency === 'orange' || /chest|breath|heart/.test(complaint);
+  return {
+    difficulty: complex ? 'complex' : 'routine',
+    diagnoses: complex
+      ? [{ name: 'Needs bedside assessment', confidence: 0.3, rationale: 'Severity or red-flag language from pre-consult.' }]
+      : [{ name: 'Common symptom-directed impression', confidence: 0.4, rationale: complaint || 'Limited history available.' }],
+    prescription: complex ? [] : [{ drug: 'Supportive care', dose: 'As clinically appropriate', notes: 'Confirm allergies before any medicine.' }],
+    assist_points: ['Review the AI pre-consult summary and examine the patient before acting.'],
+    red_flags: complex ? ['Do not auto-prescribe until the patient is examined.'] : [],
+    reasoning: complex
+      ? 'Offline assist: this looks like a harder case, so only guidance is offered.'
+      : 'Offline assist: a conservative draft plan is offered for the doctor to edit.',
+    disclaimer: 'Decision support only. Confirm the history and examine the patient before diagnosing or prescribing.',
+    generated_at: new Date().toISOString(),
+    model_used: 'local-diagnose-fallback',
+  };
+}
+
+export async function aiDiagnose(payload: DiagnosePayload): Promise<Record<string, unknown>> {
+  try {
+    return (await post('/ai/diagnose', payload)) as Record<string, unknown>;
+  } catch (err) {
+    logger.warn('AI diagnose unavailable: ' + (err as Error).message);
+    return fallbackDiagnose(payload);
+  }
 }
 
 export async function aiRecommendSlots(payload: SlotRecommendPayload): Promise<{ recommendations: Record<string, unknown>[] }> {

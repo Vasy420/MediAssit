@@ -22,7 +22,7 @@ after(async () => {
 async function patientToken(email = 'appt@test.com') {
   const res = await request(app())
     .post('/api/auth/register')
-    .send({ name: 'Appt Patient', email, password: 'Secret@123' });
+    .send({ name: 'Appt ' + email, email, password: 'Secret@123' });
   return tokenFrom(res.body);
 }
 
@@ -72,6 +72,26 @@ test('double-booking the same slot is rejected', async () => {
     .set(auth(token))
     .send({ doctor_id: 'D001', date, time: '09:00 AM', reason: 'Second' });
   assert.strictEqual(second.status, 409);
+});
+
+test('booking inherits the latest triage urgency when none is sent', async () => {
+  const token = await patientToken('appt-urgency@test.com');
+  const me = await request(app()).get('/api/patients/me').set(auth(token));
+  const patientId = me.body.data.patient.patient_id;
+  const { Conversation } = await import('../src/models/Conversation.js');
+  await Conversation.create({
+    conversation_id: 'C-URGENCY-1',
+    patient_id: patientId,
+    status: 'completed',
+    urgency: 'orange',
+    updated_at: new Date(),
+  });
+  const book = await request(app())
+    .post('/api/appointments')
+    .set(auth(token))
+    .send({ doctor_id: 'D001', date: isoDaysFromNow(3), time: '11:00 AM', reason: 'Follow-up from triage' });
+  assert.strictEqual(book.status, 201, JSON.stringify(book.body));
+  assert.strictEqual(book.body.data.appointment.urgency, 'orange');
 });
 
 test('patients can cancel their own appointment', async () => {

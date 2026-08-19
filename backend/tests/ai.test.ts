@@ -13,7 +13,7 @@ after(async () => {
 async function patientToken(email = 'ai@test.com') {
   const res = await request(app())
     .post('/api/auth/register')
-    .send({ name: 'AI Patient', email, password: 'Secret@123' });
+    .send({ name: 'AI ' + email, email, password: 'Secret@123' });
   return tokenFrom(res.body);
 }
 

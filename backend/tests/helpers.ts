@@ -12,8 +12,12 @@ export async function setupDb() {
 }
 
 export async function teardownDb() {
-  await mongoose.disconnect();
-  if (mem) await mem.stop();
+  await mongoose.disconnect().catch(() => undefined);
+  if (!mem) return;
+  await Promise.race([
+    mem.stop(),
+    new Promise((resolve) => setTimeout(resolve, 2000)),
+  ]);
 }
 
 export const app = () => createApp();

@@ -1,4 +1,5 @@
 from app.agents import appointment_agent, queue_agent, report_agent
+from app.agents.slot_agent import recommend_slots
 
 
 def test_appointment_slot_message():
@@ -54,3 +55,28 @@ def test_report_parser_extracts_sections():
     assert summary['diagnosis'] == 'Asthma'
     assert summary['treatment'] == 'Inhaler'
     assert summary['follow_up'] == '2 weeks'
+
+
+def test_slot_recommendation_prefers_shorter_wait():
+    recs = recommend_slots([
+        {'doctor_id': 'D2', 'doctor_name': 'Slow', 'specialization': 'GP', 'date': '2026-08-14', 'time': '09:00 AM', 'estimated_wait_minutes': 45, 'rating': 4.2, 'experience_years': 8},
+        {'doctor_id': 'D1', 'doctor_name': 'Fast', 'specialization': 'GP', 'date': '2026-08-14', 'time': '09:30 AM', 'estimated_wait_minutes': 5, 'rating': 4.2, 'experience_years': 8},
+    ], urgency='green')
+    assert recs[0]['doctor_id'] == 'D1'
+    assert recs[0]['estimated_wait_minutes'] == 5
+
+
+def test_slot_recommendation_prefers_experience_and_rating_when_wait_is_similar():
+    recs = recommend_slots([
+        {'doctor_id': 'D2', 'doctor_name': 'Junior', 'specialization': 'GP', 'date': '2026-08-14', 'time': '09:00 AM', 'estimated_wait_minutes': 10, 'rating': 3.8, 'experience_years': 2},
+        {'doctor_id': 'D1', 'doctor_name': 'Senior', 'specialization': 'GP', 'date': '2026-08-14', 'time': '09:30 AM', 'estimated_wait_minutes': 12, 'rating': 4.9, 'experience_years': 18},
+    ], urgency='green')
+    assert recs[0]['doctor_id'] == 'D1'
+
+
+def test_slot_recommendation_urgent_prefers_earlier_slot():
+    recs = recommend_slots([
+        {'doctor_id': 'D1', 'doctor_name': 'Later', 'specialization': 'GP', 'date': '2026-08-16', 'time': '09:00 AM', 'estimated_wait_minutes': 0},
+        {'doctor_id': 'D1', 'doctor_name': 'Sooner', 'specialization': 'GP', 'date': '2026-08-14', 'time': '02:00 PM', 'estimated_wait_minutes': 10},
+    ], urgency='red')
+    assert recs[0]['date'] == '2026-08-14'

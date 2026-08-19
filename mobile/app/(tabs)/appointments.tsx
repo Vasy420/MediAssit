@@ -6,7 +6,9 @@ import { api } from '../../src/api/client';
 import type { Appointment } from '../../src/types';
 import { useSettings } from '../../src/contexts/SettingsContext';
 import { Button } from '../../src/ui/Button';
+import { ButtonStack } from '../../src/ui/ButtonStack';
 import { Card } from '../../src/ui/Card';
+import { FadeSlide, Stagger } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
 import { StatusBadge } from '../../src/ui/StatusBadge';
 import { colors, layout, radii, spacing, typography } from '../../src/ui/theme';
@@ -19,7 +21,7 @@ function urgencyColor(level?: string): string {
 
 export default function AppointmentsScreen() {
   const router = useRouter();
-  const { testMode, fakeAppointments, removeFakeAppointment } = useSettings();
+  const { testMode, theme, fakeAppointments, removeFakeAppointment } = useSettings();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,7 +93,7 @@ export default function AppointmentsScreen() {
   };
 
   if (loading) {
-    return <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />;
+    return <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 60 }} />;
   }
 
   return (
@@ -101,51 +103,55 @@ export default function AppointmentsScreen() {
       keyExtractor={(item) => item.appointment_id}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadAppointments(); }} tintColor={colors.primary} />}
-      renderItem={({ item: appt }) => {
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadAppointments(); }} tintColor={theme.primary} />}
+      renderItem={({ item: appt, index }) => {
         const date = new Date(appt.date);
         return (
-        <Card style={styles.card}>
+        <Stagger index={index} style={styles.card}>
+        <Card>
           <View style={styles.cardTop}>
-            <View style={[styles.dateChip, { backgroundColor: colors.primarySoft }]}>
-              <Text style={styles.dateChipDay}>{date.getDate()}</Text>
-              <Text style={styles.dateChipMonth}>{date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</Text>
+            <View style={[styles.dateChip, { backgroundColor: theme.primarySoft }]}>
+              <Text style={[styles.dateChipDay, { color: theme.primaryDark }]}>{date.getDate()}</Text>
+              <Text style={[styles.dateChipMonth, { color: theme.primaryDark }]}>{date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</Text>
             </View>
             <View style={styles.cardHeaderInfo}>
-              <Text style={styles.doctorName} numberOfLines={1}>{appt.doctor_name ?? 'Doctor'}</Text>
-              <Text style={styles.time}>{date.toLocaleDateString('en-US', { weekday: 'short' })} · {appt.time}</Text>
+              <Text style={[styles.doctorName, { color: theme.ink }]} numberOfLines={1}>{appt.doctor_name ?? 'Doctor'}</Text>
+              <Text style={[styles.time, { color: theme.primary }]}>{date.toLocaleDateString('en-US', { weekday: 'short' })} · {appt.time}</Text>
             </View>
             <StatusBadge label={appt.status.replace(/_/g, ' ')} tone={STATUS_TONES[appt.status as keyof typeof STATUS_TONES] || 'neutral'} />
           </View>
           {appt.is_fake ? <View style={styles.fakeBadge}><StatusBadge label="Fake test data" tone="warning" /></View> : null}
           {appt.hospital ? (
             <View style={styles.metaRow}>
-              <Ionicons name="business-outline" size={13} color={colors.inkMuted} />
-              <Text style={styles.hospital}>{appt.hospital}</Text>
+              <Ionicons name="business-outline" size={13} color={theme.inkMuted} />
+              <Text style={[styles.hospital, { color: theme.inkMuted }]}>{appt.hospital}</Text>
             </View>
           ) : null}
-          {appt.reason ? <Text style={styles.reason}>Reason: {appt.reason}</Text> : null}
+          {appt.reason ? <Text style={[styles.reason, { color: theme.inkMuted }]}>Reason: {appt.reason}</Text> : null}
           {appt.urgency ? (
             <Text style={[styles.urgency, { color: urgencyColor(appt.urgency) }]}>
               Urgency: {appt.urgency.toUpperCase()}
             </Text>
           ) : null}
           {(['scheduled', 'confirmed', 'in_queue'] as Appointment['status'][]).includes(appt.status) && (
-            <View style={styles.actions}>
-              <Button title="Pre-Consult" variant="secondary" style={styles.actionButton} onPress={() => router.push(`/preconsult/${appt.appointment_id}`)} />
-              <Button title={appt.status === 'in_queue' ? 'View Queue' : 'Join Queue'} variant="success" style={styles.actionButton} onPress={() => handleJoinQueue(appt)} />
-              <Button title="Cancel" variant="danger" style={styles.actionButton} onPress={() => handleCancel(appt)} />
-            </View>
+            <ButtonStack>
+              <Button title={appt.status === 'in_queue' ? 'View queue' : 'Join queue'} icon={appt.status === 'in_queue' ? 'time-outline' : 'log-in-outline'} onPress={() => handleJoinQueue(appt)} />
+              <Button title="Pre-consultation" icon="clipboard-outline" variant="secondary" onPress={() => router.push(`/preconsult/${appt.appointment_id}`)} />
+              <Button title="Cancel visit" icon="close-outline" variant="ghost" onPress={() => handleCancel(appt)} />
+            </ButtonStack>
           )}
         </Card>
+        </Stagger>
         );
       }}
       ListEmptyComponent={
-        <View style={styles.emptyView}>
-          <Ionicons name="calendar-clear-outline" size={40} color={colors.inkSubtle} />
-          <Text style={styles.emptyText}>No appointments yet.</Text>
-          <Button title="Find a Doctor" variant="secondary" onPress={() => router.push('/(tabs)/doctors')} />
-        </View>
+        <FadeSlide>
+          <View style={styles.emptyView}>
+            <Ionicons name="calendar-clear-outline" size={40} color={theme.inkSubtle} />
+            <Text style={[styles.emptyText, { color: theme.inkSubtle }]}>No appointments yet.</Text>
+            <Button title="Find a doctor" icon="medical-outline" variant="secondary" onPress={() => router.push('/(tabs)/doctors')} />
+          </View>
+        </FadeSlide>
       }
     />
     </Screen>
@@ -157,18 +163,16 @@ const styles = StyleSheet.create({
   card: { marginBottom: spacing.md },
   cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
   dateChip: { width: 48, height: 52, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
-  dateChipDay: { fontSize: 18, fontWeight: '800', color: colors.primaryDark },
-  dateChipMonth: { ...typography.caption, fontSize: 10, fontWeight: '700', color: colors.primaryDark, letterSpacing: 0.5 },
+  dateChipDay: { fontSize: 18, fontWeight: '800' },
+  dateChipMonth: { ...typography.caption, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   cardHeaderInfo: { flex: 1, marginHorizontal: spacing.md },
-  doctorName: { ...typography.heading, color: colors.ink },
-  time: { ...typography.caption, color: colors.primary, marginTop: 2, fontWeight: '600' },
+  doctorName: { ...typography.heading },
+  time: { ...typography.caption, marginTop: 2, fontWeight: '600' },
   fakeBadge: { marginBottom: spacing.xs },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
-  hospital: { ...typography.caption, color: colors.inkMuted },
-  reason: { ...typography.body, color: colors.inkMuted, marginTop: spacing.xs },
+  hospital: { ...typography.caption },
+  reason: { ...typography.body, marginTop: spacing.xs },
   urgency: { ...typography.caption, fontWeight: '700', marginTop: spacing.sm },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md, flexWrap: 'wrap' },
-  actionButton: { flexGrow: 1, flexBasis: '30%', paddingHorizontal: spacing.sm },
   emptyView: { alignItems: 'center', marginTop: 60, gap: spacing.md },
-  emptyText: { ...typography.body, color: colors.inkSubtle },
+  emptyText: { ...typography.body },
 });

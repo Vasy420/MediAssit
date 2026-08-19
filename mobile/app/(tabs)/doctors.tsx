@@ -3,11 +3,12 @@ import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, Pre
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/api/client';
-import type { Appointment, Doctor } from '../../src/types';
+import type { Appointment, Doctor, SlotRecommendation } from '../../src/types';
 import { fakeDoctors } from '../../src/data/testData';
 import { useSettings } from '../../src/contexts/SettingsContext';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
+import { FadeSlide, Stagger } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
 import { StatusBadge } from '../../src/ui/StatusBadge';
 import { TextField } from '../../src/ui/TextField';
@@ -80,6 +81,7 @@ export default function DoctorsScreen() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [bookingError, setBookingError] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [suggestions, setSuggestions] = useState<SlotRecommendation[]>([]);
 
   const visibleDoctors = testMode
     ? [...fakeDoctors, ...doctors.filter((doctor) => !doctor.doctor_id.startsWith('FAKE-'))]
@@ -97,7 +99,17 @@ export default function DoctorsScreen() {
         setLoading(false);
       }
     }
+    async function loadSuggestions() {
+      try {
+        const res = await api.post<{ recommendations?: SlotRecommendation[] }>('/api/slots/recommend', {});
+        const payload = (res.data as { recommendations?: SlotRecommendation[] } | undefined) ?? {};
+        setSuggestions(payload.recommendations ?? []);
+      } catch {
+        setSuggestions([]);
+      }
+    }
     void loadDoctors();
+    void loadSuggestions();
   }, []);
 
   const loadSlots = async (doctor: Doctor, date: string) => {
@@ -121,14 +133,30 @@ export default function DoctorsScreen() {
     }
   };
 
-  const openBooking = (doctor: Doctor) => {
-    const date = nextBookableDate();
+  const openBooking = (doctor: Doctor, preset?: { date?: string; time?: string }) => {
+    const date = preset?.date || nextBookableDate();
     setSelectedDoctor(doctor);
     setBookingDate(date);
     setReason('General consultation');
     setBookingError('');
     setShowDatePicker(false);
-    void loadSlots(doctor, date);
+    setBookingTime(preset?.time ?? null);
+    void loadSlots(doctor, date).then(() => {
+      if (preset?.time) setBookingTime(preset.time);
+    });
+  };
+
+  const openSuggested = (slot: SlotRecommendation) => {
+    const existing = visibleDoctors.find((doctor) => doctor.doctor_id === slot.doctor_id);
+    const doctor = existing ?? {
+      doctor_id: slot.doctor_id,
+      user: { user_id: slot.doctor_id, role: 'doctor' as const, name: slot.doctor_name, email: '' },
+      specialty: slot.specialization,
+      department: slot.specialization,
+      experience_years: 0,
+      is_available: true,
+    };
+    openBooking(doctor, { date: slot.date, time: slot.time });
   };
 
   const closeBooking = () => {
@@ -196,8 +224,9 @@ export default function DoctorsScreen() {
         data={visibleDoctors}
         keyExtractor={(item) => item.doctor_id}
         contentContainerStyle={styles.container}
-        renderItem={({ item: doctor }) => (
-          <Card style={styles.card}>
+        renderItem={({ item: doctor, index }) => (
+          <Stagger index={index} style={styles.card}>
+          <Card>
             <Pressable accessibilityRole="button" onPress={() => router.push(`/doctor/${doctor.doctor_id}`)} style={({ pressed }) => [styles.cardHeader, pressed && styles.pressed]}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{doctor.user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}</Text>
@@ -216,15 +245,34 @@ export default function DoctorsScreen() {
             </View>
             {doctor.doctor_id.startsWith('FAKE-') && <StatusBadge label="Fake test data" tone="warning" />}
             <Button
-              title={bookingDoctor === doctor.doctor_id ? 'Preparing...' : doctor.doctor_id.startsWith('FAKE-') ? 'Add Fake Appointment' : 'Schedule Appointment'}
+              title={bookingDoctor === doctor.doctor_id ? 'Preparing...' : doctor.doctor_id.startsWith('FAKE-') ? 'Add fake appointment' : 'Schedule appointment'}
+              icon="calendar-outline"
               style={styles.bookBtn}
               onPress={() => openBooking(doctor)}
               disabled={!doctor.is_available || bookingDoctor !== null}
               loading={bookingDoctor === doctor.doctor_id}
             />
           </Card>
+          </Stagger>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>No doctors available.</Text>}
+        ListHeaderComponent={suggestions.length > 0 ? (
+          <FadeSlide>
+          <Card style={styles.suggestCard}>
+            <Text style={styles.suggestTitle}>Suggested times</Text>
+            <Text style={styles.suggestSubtitle}>Ranked by wait time, experience, and service rating</Text>
+            {suggestions.slice(0, 5).map((slot) => (
+              <Pressable key={`${slot.doctor_id}-${slot.date}-${slot.time}`} onPress={() => openSuggested(slot)} style={({ pressed }) => [styles.suggestRow, pressed && styles.pressed]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.suggestDoctor}>{slot.doctor_name}</Text>
+                  <Text style={styles.suggestMeta}>{slot.date} · {slot.time} · ~{slot.estimated_wait_minutes} min wait</Text>
+                  {slot.reason ? <Text style={styles.suggestReason}>{slot.reason}</Text> : null}
+                </View>
+              </Pressable>
+            ))}
+          </Card>
+          </FadeSlide>
+        ) : null}
+        ListEmptyComponent={<FadeSlide><Text style={styles.empty}>No doctors available.</Text></FadeSlide>}
       />
 
       <Modal visible={selectedDoctor !== null} transparent animationType="slide" onRequestClose={closeBooking}>
@@ -278,7 +326,7 @@ export default function DoctorsScreen() {
               </View>
               <TextField label="Reason for visit" placeholder="What do you need help with?" value={reason} onChangeText={(value) => { setReason(value); setBookingError(''); }} multiline containerStyle={styles.modalField} />
               {bookingError ? <Text style={[styles.bookingError, { color: theme.danger }]}>{bookingError}</Text> : null}
-              <Button title={selectedDoctor?.doctor_id.startsWith('FAKE-') ? 'Add fake appointment' : 'Confirm appointment'} onPress={handleConfirmBooking} loading={bookingDoctor !== null} disabled={bookingDoctor !== null} />
+              <Button title={selectedDoctor?.doctor_id.startsWith('FAKE-') ? 'Add fake appointment' : 'Confirm appointment'} icon="checkmark-outline" size="lg" onPress={handleConfirmBooking} loading={bookingDoctor !== null} disabled={bookingDoctor !== null} />
               <Button title="Cancel" variant="ghost" onPress={closeBooking} disabled={bookingDoctor !== null} />
             </ScrollView>
           </View>
@@ -301,6 +349,13 @@ const styles = StyleSheet.create({
   meta: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md, alignItems: 'center' },
   metaText: { ...typography.caption, color: colors.inkMuted },
   bookBtn: { width: '100%', marginTop: spacing.md },
+  suggestCard: { marginBottom: spacing.lg },
+  suggestTitle: { ...typography.heading, color: colors.ink },
+  suggestSubtitle: { ...typography.caption, color: colors.inkMuted, marginBottom: spacing.sm },
+  suggestRow: { paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  suggestDoctor: { ...typography.body, color: colors.ink, fontWeight: '700' },
+  suggestMeta: { ...typography.caption, color: colors.primary, marginTop: 2 },
+  suggestReason: { ...typography.caption, color: colors.inkMuted, marginTop: 2 },
   empty: { textAlign: 'center', color: colors.inkSubtle, marginTop: 40, fontSize: 16 },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15, 42, 67, 0.46)' },
   modalCard: { maxHeight: '92%', borderTopLeftRadius: 24, borderTopRightRadius: 24 },

@@ -1,37 +1,44 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '../../src/contexts/SettingsContext';
-import { radii, typography } from '../../src/ui/theme';
+import { AnimatedTabIcon } from '../../src/ui/motion';
+import { AppleHeaderIcon, AppleTabBarBackground, floatingTabScenePadding, useAppleTabBarStyle } from '../../src/ui/navigation';
+import { fonts, typography } from '../../src/ui/theme';
+import { Text, View } from 'react-native';
+
+function SymptomHeader() {
+  const { theme } = useSettings();
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Text style={{ fontFamily: fonts.sansSemi, fontSize: 17, color: theme.ink }}>Symptom Check</Text>
+      <Text style={{ ...typography.caption, color: theme.inkSubtle }}>Guidance only · not a diagnosis</Text>
+    </View>
+  );
+}
 
 export default function TabLayout() {
-  const insets = useSafeAreaInsets();
   const { theme } = useSettings();
+  const router = useRouter();
+  const tabBarStyle = useAppleTabBarStyle();
 
   return (
     <Tabs
       screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: theme.background },
-        headerTintColor: theme.ink,
-        headerTitleStyle: typography.heading,
         headerShadowVisible: false,
-        sceneStyle: { backgroundColor: theme.background },
-        tabBarActiveTintColor: theme.primaryDark,
+        headerTitleAlign: 'center',
+        headerTintColor: theme.primary,
+        headerTitleStyle: { fontFamily: fonts.sansSemi, fontSize: 17, fontWeight: '600', color: theme.ink },
+        headerStyle: { backgroundColor: theme.background },
+        sceneStyle: { backgroundColor: theme.background, paddingBottom: floatingTabScenePadding() },
+        tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.inkSubtle,
-        tabBarActiveBackgroundColor: theme.primarySoft,
-        tabBarLabelStyle: { ...typography.caption, fontSize: 11 },
-        tabBarItemStyle: { borderRadius: radii.md, marginHorizontal: 3, marginVertical: 6 },
-        tabBarIconStyle: { marginTop: 2 },
-        tabBarStyle: {
-          height: 70 + insets.bottom,
-          paddingTop: 4,
-          paddingBottom: Math.max(insets.bottom, 8),
-          backgroundColor: theme.surface,
-          borderTopWidth: 1,
-          borderTopColor: theme.border,
-        },
+        tabBarLabelStyle: { fontFamily: fonts.sansMedium, fontSize: 11, fontWeight: '500' },
+        tabBarItemStyle: { paddingTop: 2 },
+        tabBarBackground: () => <AppleTabBarBackground />,
+        tabBarStyle,
         tabBarHideOnKeyboard: true,
+        animation: 'fade',
       }}
     >
       <Tabs.Screen
@@ -39,15 +46,23 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarLabel: 'Home',
-          tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={focused ? size + 1 : size} color={color} />,
+          headerRight: () => (
+            <AppleHeaderIcon
+              icon="notifications-outline"
+              accessibilityLabel="Notifications"
+              onPress={() => router.push('/notifications')}
+            />
+          ),
+          tabBarIcon: ({ color, focused }) => <AnimatedTabIcon focused={focused}><Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} /></AnimatedTabIcon>,
         }}
       />
       <Tabs.Screen
         name="ai-chat"
         options={{
           title: 'Symptom Check',
-          tabBarLabel: 'Check',
-          tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={focused ? size + 1 : size} color={color} />,
+          tabBarLabel: 'Symptoms',
+          headerTitle: () => <SymptomHeader />,
+          tabBarIcon: ({ color, focused }) => <AnimatedTabIcon focused={focused}><Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} /></AnimatedTabIcon>,
         }}
       />
       <Tabs.Screen
@@ -55,15 +70,15 @@ export default function TabLayout() {
         options={{
           title: 'Doctors',
           tabBarLabel: 'Doctors',
-          tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'medical' : 'medical-outline'} size={focused ? size + 1 : size} color={color} />,
+          tabBarIcon: ({ color, focused }) => <AnimatedTabIcon focused={focused}><Ionicons name={focused ? 'medical' : 'medical-outline'} size={24} color={color} /></AnimatedTabIcon>,
         }}
       />
       <Tabs.Screen
         name="appointments"
         options={{
-          title: 'Appointments',
-          tabBarLabel: 'Appts',
-          tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={focused ? size + 1 : size} color={color} />,
+          title: 'Visits',
+          tabBarLabel: 'Visits',
+          tabBarIcon: ({ color, focused }) => <AnimatedTabIcon focused={focused}><Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={24} color={color} /></AnimatedTabIcon>,
         }}
       />
       <Tabs.Screen
@@ -71,7 +86,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'person' : 'person-outline'} size={focused ? size + 1 : size} color={color} />,
+          tabBarIcon: ({ color, focused }) => <AnimatedTabIcon focused={focused}><Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} /></AnimatedTabIcon>,
         }}
       />
     </Tabs>

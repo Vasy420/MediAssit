@@ -9,6 +9,7 @@ const queueSchema = new Schema({
   priority_score: { type: Number, required: true, default: 0 },
   urgency: { type: String, enum: ['green', 'yellow', 'orange', 'red'], default: 'green' },
   waiting_time: { type: Number, default: 0 },
+  notified_position: { type: Number },
   status: {
     type: String,
     enum: ['waiting', 'called', 'in_consultation', 'completed', 'cancelled'],

@@ -9,7 +9,7 @@
     "start": "node dist/server.js",
     "build": "tsc",
     "seed": "tsx src/seed/seed.ts",
-    "test": "node --import tsx --test tests/*.test.ts"
+    "test": "node --import tsx --test --test-concurrency=1 tests/*.test.ts"
   },
   "engines": {
     "node": ">=20"

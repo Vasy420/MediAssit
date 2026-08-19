@@ -6,6 +6,8 @@ import { Errors } from '../utils/ApiError.js';
 import { nextId } from '../utils/idGen.js';
 import { logger } from '../utils/logger.js';
 import { emitQueueUpdate } from './realtimeService.js';
+import { notify } from './notificationService.js';
+import { guidanceFor } from './urgencyGuidance.js';
 import type { QueueType } from '../models/Queue.js';
 import type { AppointmentType } from '../models/Appointment.js';
 import type { PatientType } from '../models/Patient.js';
@@ -29,6 +31,8 @@ interface QueueView extends QueueType {
   doctor?: { doctor_id: string; name: string; specialization: string } | null;
   appointment_time?: string;
   appointment_date?: string;
+  estimated_wait_minutes?: number;
+  priority_guidance?: ReturnType<typeof guidanceFor>;
 }
 
 function toQueueView(queue: QueueType, appt?: AppointmentType | null): QueueView {
@@ -76,15 +80,27 @@ export async function joinQueue(appointmentId: string) {
 
   await Appointment.updateOne({ appointment_id: appointmentId }, { status: 'in_queue' });
   logger.audit('queue-join', { queue_id: queue_token, appointment_id: appointmentId });
-
-  const view = toQueueView(queue.toObject(), null);
+  await notifyQueuePositions(appt.doctor_id);
   emitQueueUpdate(queue_token, {
     queue_id: queue_token,
     position: 1,
     waiting_time: 0,
     status: 'waiting',
   });
-  return view;
+  return toQueueView(queue.toObject(), null);
+}
+
+export async function notifyQueuePositions(doctorId: string): Promise<void> {
+  const rows = await listDoctorQueue(doctorId);
+  for (const row of rows) {
+    if (row.status !== 'waiting' || row.position == null) continue;
+    if (row.notified_position === row.position) continue;
+    const patient = await Patient.findOne({ patient_id: row.patient_id }).select('user_id').lean();
+    if (patient?.user_id) {
+      await notify.queueUpdate(patient.user_id, row.queue_id, row.position, row.waiting_time ?? 0);
+    }
+    await Queue.updateOne({ queue_id: row.queue_id }, { $set: { notified_position: row.position } });
+  }
 }
 
 export async function findQueue(queueId: string): Promise<QueueView> {
@@ -97,6 +113,9 @@ export async function findQueue(queueId: string): Promise<QueueView> {
     ...toQueueView(queue as unknown as QueueType, (appt as unknown as AppointmentType) ?? null),
     position: current?.position,
     waiting_time: current?.waiting_time ?? queue.waiting_time,
+    estimated_wait_minutes: current?.waiting_time ?? queue.waiting_time,
+    urgency: queue.urgency,
+    priority_guidance: guidanceFor(queue.urgency),
     appointment_time: appt?.time,
     appointment_date: appt?.date,
   };
@@ -125,7 +144,9 @@ export async function listDoctorQueue(doctorId: string): Promise<QueueView[]> {
       ...(row as unknown as QueueType),
       position: i + 1,
       waiting_time: i * AVG_CONSULT_MINUTES,
+      estimated_wait_minutes: i * AVG_CONSULT_MINUTES,
       patient: p ?? null,
+      priority_guidance: guidanceFor(row.urgency),
       appointment_time: appt?.time,
       appointment_date: appt?.date,
     };
@@ -150,6 +171,8 @@ export async function listPatientQueue(patientId: string): Promise<QueueView | n
     ...(row as unknown as QueueType),
     position: index >= 0 ? index + 1 : 1,
     waiting_time: index >= 0 ? index * AVG_CONSULT_MINUTES : 0,
+    estimated_wait_minutes: index >= 0 ? index * AVG_CONSULT_MINUTES : 0,
+    priority_guidance: guidanceFor(row.urgency),
     doctor,
   };
 }
@@ -179,6 +202,7 @@ export async function updateQueueStatus(queueId: string, status: string): Promis
     await Appointment.updateOne({ appointment_id: queue.appointment_id }, { status: 'confirmed' });
   }
   logger.audit('queue-status-change', { queue_id: queueId, status });
+  await notifyQueuePositions(queue.doctor_id);
   const updated = await findQueue(queueId);
   emitQueueUpdate(queueId, {
     queue_id: queueId,
@@ -212,5 +236,6 @@ export async function overridePriority(
     },
   );
   logger.audit('queue-override', { queue_id: queueId, actor, reason });
+  await notifyQueuePositions(queue.doctor_id);
   return findQueue(queueId);
 }

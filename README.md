@@ -29,16 +29,20 @@ AI-powered healthcare navigation and management platform. Streamlines patient tr
 
 ## Features
 
-- **Symptom Triage Chat** — Multi-turn AI conversation to assess symptoms and determine urgency level (voice input + read-aloud supported)
+- **Symptom Triage Chat** — Multi-turn AI conversation to assess symptoms and determine urgency (voice input + read-aloud supported)
+- **AI Pre-Consultation Interview** — Collects patient basics and symptom follow-ups, then writes a structured summary for the doctor
+- **AI Patient Summary** — Doctor consultation view with the AI summary, symptoms, urgency, and notes
+- **AI Urgency Guidance** — Symptom Check assigns green / yellow / orange / red and applies it to booking
+- **Smart Slot Recommendation** — Suggests times from doctor availability and estimated wait
 - **Doctor Discovery** — Browse and search doctors by specialization
 - **Appointment Management** — Book, view, and cancel appointments
-- **Priority Queue** — Urgency-weighted triage queue with doctor calling, manual override, and live position/ETA via WebSocket
+- **Priority Queue** — Token, live position/ETA via WebSocket, doctor calling, and urgency-based priority
 - **Medical Reports** — Upload reports and get AI-generated plain-language summaries
 - **Report OCR Scan** — Photograph a paper report; tesseract.js extracts the text and the AI writes a plain-language summary
-- **Prescriptions & Follow-ups** — Doctors write structured prescriptions (medication, dosage, frequency, follow-up date) after a consultation; patients get a digital copy + push notification
+- **Prescriptions & Follow-ups** — Doctors write structured prescriptions after a consultation; patients get a digital copy
 - **Health Timeline** — Every appointment, report, prescription, pre-consultation, and triage in one chronological journal
-- **Family & Guardian Mode** — Link family accounts (parent/child/spouse/sibling) and view their health records
-- **Push Notifications** — Expo push notifications for queue updates and doctor calls
+- **Family & Guardian Mode** — Link family accounts and view their health records
+- **Notifications** — Appointment confirmation, reminder, queue position, and doctor availability (in-app inbox; Expo push optional)
 - **Auth** — JWT-based registration, login, and role-based access (patient/doctor/admin)
 
 ---
@@ -163,6 +167,31 @@ Opens Expo dev tools. Press `w` for web, scan QR for mobile (Expo Go app).
 
 Live updates: subscribe to Socket.IO room `queue:<queue_id>` (`queue:subscribe`/`queue:unsubscribe` events), receive `queue:update` events with position/ETA/status.
 
+### Pre-consultation
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/preconsult/start` | Start or resume the interview for an appointment |
+| POST | `/api/preconsult/answer` | Submit the next answer |
+| GET | `/api/preconsult/:appointmentId` | Fetch the stored interview / summary |
+
+### Slots
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/slots/recommend` | Rank open slots by wait time and how soon they are |
+
+### Doctor dashboard
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/doctor-dashboard/dashboard` | Upcoming appointments and queue snapshot |
+| GET | `/api/doctor-dashboard/consultation/:appointmentId` | Patient details, AI summary, urgency, notes |
+| POST | `/api/doctor-dashboard/notes` | Add a doctor note |
+
+### Notifications
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/notifications` | In-app inbox for the current user |
+| PATCH | `/api/notifications/:id/read` | Mark a notification as read |
+
 ### Prescriptions
 | Method | Path | Description |
 |--------|------|-------------|
@@ -213,7 +242,7 @@ Live updates: subscribe to Socket.IO room `queue:<queue_id>` (`queue:subscribe`/
 mediassist/
 ├── ai-service/           # Python FastAPI microservice
 │   ├── app/
-│   │   ├── agents/       # triage, report, appointment, queue agents
+│   │   ├── agents/       # triage, preconsult, slot, report, appointment, queue agents
 │   │   ├── config.py     # Environment config
 │   │   └── main.py       # FastAPI app + route definitions
 │   ├── tests/
@@ -236,7 +265,10 @@ mediassist/
 │   │   ├── (tabs)/       # Home, AI chat, doctors, appointments, profile
 │   │   ├── reports/      # Medical report detail + OCR scan screens
 │   │   ├── prescriptions/ # Prescription list, detail, doctor write screen
+│   │   ├── preconsult/   # AI pre-consultation interview
+│   │   ├── doctor/       # Doctor profile + consultation view
 │   │   ├── queue/        # Queue status screen (live WebSocket updates)
+│   │   ├── notifications.tsx
 │   │   ├── timeline.tsx  # Health timeline journal
 │   │   └── family.tsx    # Family & guardian links
 │   └── src/

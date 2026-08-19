@@ -5,6 +5,7 @@ import { Errors } from '../utils/ApiError.js';
 import { nextId } from '../utils/idGen.js';
 import { weekdayName } from '../utils/time.js';
 import { getAvailability } from './doctorService.js';
+import { latestPatientUrgency } from './preconsultService.js';
 
 export interface BookAppointmentInput {
   patient_id: string;
@@ -36,6 +37,7 @@ export async function bookAppointment(input: BookAppointmentInput) {
   if (existing) throw Errors.conflict('This time slot was just booked by someone else.');
 
   const appointment_id = await nextId('A');
+  const inherited = input.urgency ?? (await latestPatientUrgency(input.patient_id)) ?? 'green';
   const appointment = await Appointment.create({
     appointment_id,
     patient_id: input.patient_id,
@@ -44,7 +46,7 @@ export async function bookAppointment(input: BookAppointmentInput) {
     time: input.time,
     hospital: input.hospital ?? '',
     reason: input.reason ?? '',
-    urgency: input.urgency ?? 'green',
+    urgency: inherited,
     status: 'scheduled',
   });
 
