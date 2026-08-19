@@ -33,6 +33,7 @@ export interface AnswerInput {
   key: string;
   answer: string;
   rephrased?: boolean;
+  from_text?: boolean;
 }
 
 export interface PatientContext {
@@ -45,4 +46,5 @@ export interface TriageChatInput {
   messages: { role: string; text: string }[];
   answers: AnswerInput[];
   patient?: PatientContext | null;
+  simple?: boolean;
 }

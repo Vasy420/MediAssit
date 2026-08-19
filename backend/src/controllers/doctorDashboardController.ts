@@ -169,7 +169,7 @@ export async function handlePatientHistory(req: Request, res: Response) {
 }
 
 export async function handleCreateNote(req: Request, res: Response) {
-  const { queueId } = req.params;
+  const queueId = String(req.params.queueId);
   const { content } = req.body as { content: string };
   if (!content) throw Errors.badRequest('content is required');
 

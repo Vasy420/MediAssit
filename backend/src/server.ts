@@ -3,14 +3,20 @@ import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { startScheduler, stopScheduler } from './services/schedulerService.js';
+import { autoSeed } from './seed/autoSeed.js';
+import { initRealtime } from './services/realtimeService.js';
 
 async function main() {
-  await connectDatabase();
+  const dbInfo = await connectDatabase();
+  // Auto-seed when using in-memory MongoDB so doctors & demo accounts exist
+  if (dbInfo.instanceName === 'in-memory-mongodb') {
+    await autoSeed();
+  }
   const app = createApp();
   const server = app.listen(env.port, () => {
     logger.info('MedAssist+ API listening on port ' + env.port + ' (' + env.nodeEnv + ')');
   });
-
+  initRealtime(server);
   startScheduler(30);
 
   const shutdown = async (signal: string) => {

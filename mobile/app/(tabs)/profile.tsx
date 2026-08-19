@@ -30,7 +30,10 @@ export default function ProfileScreen() {
         <InfoRow label="User ID" value={user?.user_id} />
       </Card>
 
-      <Button title="Settings" variant="secondary" style={styles.settingsBtn} onPress={() => router.push('/settings')} />
+      <Button title="Health Timeline" variant="secondary" style={styles.settingsBtn} onPress={() => router.push('/timeline')} />
+      <Button title="Family & Guardians" variant="secondary" style={styles.familyBtn} onPress={() => router.push('/family')} />
+      <Button title="My Prescriptions" variant="secondary" style={styles.familyBtn} onPress={() => router.push('/prescriptions')} />
+      <Button title="Settings" variant="secondary" style={styles.familyBtn} onPress={() => router.push('/settings')} />
       <Button title="Logout" variant="danger" style={styles.logoutBtn} onPress={handleLogout} />
     </ScrollView>
     </Screen>
@@ -58,5 +61,6 @@ const styles = StyleSheet.create({
   infoLabel: { ...typography.caption },
   infoValue: { ...typography.caption, fontWeight: '600' },
   settingsBtn: { marginTop: spacing.xl, width: '100%' },
+  familyBtn: { marginTop: spacing.md, width: '100%' },
   logoutBtn: { marginTop: spacing.md, width: '100%' },
 });

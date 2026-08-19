@@ -86,7 +86,7 @@ export async function handlePreConsultAnswer(req: Request, res: Response) {
 }
 
 export async function handleGetPreConsult(req: Request, res: Response) {
-  const { appointmentId } = req.params;
+  const appointmentId = String(req.params.appointmentId);
   if (!appointmentId) throw Errors.badRequest('appointmentId is required');
 
   const pc = await getPreConsultByAppointment(appointmentId);

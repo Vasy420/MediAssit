@@ -99,6 +99,24 @@ export default function HomeScreen() {
         </View>
         <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.85)" />
       </Pressable>
+
+      <Pressable style={({ pressed }) => [styles.actionCard, { backgroundColor: colors.success }, pressed && styles.pressed]} onPress={() => router.push('/reports/scan')}>
+        <View style={styles.actionIconWrap}><Ionicons name="scan" size={22} color={colors.white} /></View>
+        <View style={styles.actionCopy}>
+          <Text style={styles.actionTitle}>Scan a Paper Report</Text>
+          <Text style={styles.actionDesc}>Snap a photo, get text + AI plain-language summary</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.85)" />
+      </Pressable>
+
+      <Pressable style={({ pressed }) => [styles.actionCard, { backgroundColor: '#5F51A5' }, pressed && styles.pressed]} onPress={() => router.push('/timeline')}>
+        <View style={styles.actionIconWrap}><Ionicons name="time" size={22} color={colors.white} /></View>
+        <View style={styles.actionCopy}>
+          <Text style={styles.actionTitle}>Health Timeline</Text>
+          <Text style={styles.actionDesc}>Every visit, report, and prescription in one place</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.85)" />
+      </Pressable>
     </ScrollView>
     </Screen>
   );

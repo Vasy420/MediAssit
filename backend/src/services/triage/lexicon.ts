@@ -40,30 +40,33 @@ export const CATEGORY_EMOJI: Record<Category, string> = {
 };
 
 const KEYWORDS: Record<Category, string[]> = {
-  fever: ['fever', 'temperature', 'chills', 'cold', 'body ache', 'body pain'],
-  stomach: ['stomach', 'abdomen', 'belly', 'vomiting', 'nausea', 'diarrhoea', 'diarrhea', 'gas', 'acidity', 'indigestion', 'poisoning'],
-  chest: ['chest', 'heart', 'palpitation', 'palpitations', 'cardiac', 'pounding'],
-  breathing: ['breath', 'breathing', 'wheeze', 'wheezing', 'cough', 'shortness', 'suffocat'],
-  head: ['headache', 'dizzy', 'dizziness', 'vertigo', 'faint', 'numb', 'vision', 'migraine', 'seizure', 'convulsion', 'blurred'],
-  bone: ['knee', 'bone', 'joint', 'fall', 'fracture', 'back pain', 'sprain', 'swell', 'twist', 'injur', 'muscle', 'leg', 'arm'],
-  skin: ['rash', 'skin', 'itch', 'itching', 'burn', 'wound', 'boil', 'acne', 'hives'],
-  ent: ['ear', 'throat', 'nose', 'hearing', 'sinus', 'tonsil', 'sore throat'],
-  women: ['period', 'pregnancy', 'menstrual', 'vaginal', 'pregnant', 'cramps'],
-  child: ['child', 'baby', 'toddler', 'infant', 'kid'],
+  fever: ['fever', 'temperature', 'chills', 'cold', 'body ache', 'body pain', 'bukhar', 'garmi', 'jwaram', 'jwar', 'gummam'],
+  stomach: ['stomach', 'abdomen', 'belly', 'vomiting', 'nausea', 'diarrhoea', 'diarrhea', 'gas', 'acidity', 'indigestion', 'poisoning', 'pet dard', 'ulti', 'dast', 'kadupu', 'kadupu noppi', 'kakkulu', 'vantulu'],
+  chest: ['chest', 'heart', 'palpitation', 'palpitations', 'cardiac', 'pounding', 'seene', 'chhati', 'dil', 'gunde', 'gundelu', 'eduru'],
+  breathing: ['breath', 'breathing', 'wheeze', 'wheezing', 'cough', 'shortness', 'suffocat', 'saans', 'khansi', 'saans lene me dikkat', 'swasam', 'dikkubadi', 'digubadi'],
+  head: ['headache', 'dizzy', 'dizziness', 'vertigo', 'faint', 'numb', 'vision', 'migraine', 'seizure', 'convulsion', 'blurred', 'sir dard', 'chakkar', 'behosh', 'kamjori', 'tala noppi', 'tala tippu', 'tala tirugu', 'moorecha'],
+  bone: ['knee', 'bone', 'joint', 'fall', 'fracture', 'back pain', 'sprain', 'swell', 'twist', 'injur', 'muscle', 'leg', 'arm', 'chot', 'haddi', 'gir', 'moch', 'sujan', 'noppi', 'eluku', 'elukula noppi', 'kaalu', 'cheyyi'],
+  skin: ['rash', 'skin', 'itch', 'itching', 'burn', 'wound', 'boil', 'acne', 'hives', 'kharish', 'daag', 'jala', 'foda', 'ghav', 'durada', 'dappulu', 'gayam', 'gayalu'],
+  ent: ['ear', 'throat', 'nose', 'hearing', 'sinus', 'tonsil', 'sore throat', 'kan dard', 'gala', 'naak', 'kan', 'chevi', 'chevi noppi', 'gonthu', 'mukku'],
+  women: ['period', 'pregnancy', 'menstrual', 'vaginal', 'pregnant', 'cramps', 'mahwari', 'garbh', 'ruthuvu', 'garabham'],
+  child: ['child', 'baby', 'toddler', 'infant', 'kid', 'bachcha', 'bachhe', 'bache', 'pilla', 'pilladu', 'papa', 'bidda'],
 };
 
 export function detectCategories(texts: string[]): Category[] {
   const joined = ' ' + texts.join(' ').toLowerCase() + ' ';
-  const found = new Set<Category>();
+  const hits: { cat: Category; at: number }[] = [];
   for (const cat of CATEGORIES) {
     for (const kw of KEYWORDS[cat]) {
-      if (joined.includes(' ' + kw + ' ') || joined.includes(' ' + kw + '.') || joined.includes(' ' + kw + ',') || joined.includes(' ' + kw)) {
-        found.add(cat);
-        break;
-      }
+      const at = joined.indexOf(' ' + kw);
+      if (at === -1) continue;
+      const after = joined[at + 1 + kw.length];
+      if (after && after !== ' ' && after !== '.' && after !== ',' && after !== '?' && after !== '!') continue;
+      hits.push({ cat, at });
+      break;
     }
   }
-  return CATEGORIES.filter((c) => found.has(c));
+  hits.sort((a, b) => a.at - b.at);
+  return hits.map((h) => h.cat);
 }
 
 export interface TriageOption {

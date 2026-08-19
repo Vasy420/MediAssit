@@ -131,3 +131,51 @@ export interface ApiResponse<T = unknown> {
   message?: string;
   data?: T;
 }
+
+export interface Medication {
+  name: string;
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
+}
+
+export interface Prescription {
+  prescription_id: string;
+  patient_id: string;
+  doctor_id: string;
+  appointment_id: string;
+  medications: Medication[];
+  instructions?: string;
+  follow_up_date?: string;
+  follow_up_notes?: string;
+  created_at?: string;
+  doctor?: { doctor_id: string; name: string; specialization: string } | null;
+}
+
+export interface TimelineEntry {
+  type: 'appointment' | 'report' | 'prescription' | 'preconsult' | 'triage';
+  id: string;
+  date: string;
+  title: string;
+  subtitle: string;
+  doctor_name?: string;
+  status?: string;
+  link: string;
+}
+
+export interface FamilyMember {
+  link_id: string;
+  relation: string;
+  user: { user_id: string; name: string; email: string; phone?: string };
+  patient: { patient_id: string; name: string; age?: number | null; gender?: string } | null;
+  created_at: string;
+}
+
+export interface ScannedReport {
+  scan_id: string;
+  patient_id: string;
+  raw_text: string;
+  ai_summary: string;
+  source: string;
+  created_at: string;
+}

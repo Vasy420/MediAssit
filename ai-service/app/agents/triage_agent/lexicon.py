@@ -18,16 +18,16 @@ CATEGORY_LABEL = {c: lang.t('category_label.' + c, _fallback=c) for c in CATEGOR
 CATEGORY_EMOJI = {c: lang.t('category_emoji.' + c, _fallback=c) for c in CATEGORIES}
 
 KEYWORDS: dict[str, list[str]] = {
-    'fever': ['fever', 'temperature', 'chills', 'cold', 'body ache', 'body pain'],
-    'stomach': ['stomach', 'abdomen', 'belly', 'vomiting', 'nausea', 'diarrhoea', 'diarrhea', 'gas', 'acidity', 'indigestion', 'poisoning'],
-    'chest': ['chest', 'heart', 'palpitation', 'palpitations', 'cardiac', 'pounding'],
-    'breathing': ['breath', 'breathing', 'wheeze', 'wheezing', 'cough', 'shortness', 'suffocat'],
-    'head': ['headache', 'dizzy', 'dizziness', 'vertigo', 'faint', 'numb', 'vision', 'migraine', 'seizure', 'convulsion', 'blurred'],
-    'bone': ['knee', 'bone', 'joint', 'fall', 'fracture', 'back pain', 'sprain', 'swell', 'twist', 'injur', 'muscle', 'leg', 'arm'],
-    'skin': ['rash', 'skin', 'itch', 'itching', 'burn', 'wound', 'boil', 'acne', 'hives'],
-    'ent': ['ear', 'throat', 'nose', 'hearing', 'sinus', 'tonsil', 'sore throat'],
-    'women': ['period', 'pregnancy', 'menstrual', 'vaginal', 'pregnant', 'cramps'],
-    'child': ['child', 'baby', 'toddler', 'infant', 'kid'],
+    'fever': ['fever', 'temperature', 'chills', 'cold', 'body ache', 'body pain', 'bukhar', 'garmi', 'jwaram', 'jwar', 'gummam'],
+    'stomach': ['stomach', 'abdomen', 'belly', 'vomiting', 'nausea', 'diarrhoea', 'diarrhea', 'gas', 'acidity', 'indigestion', 'poisoning', 'pet dard', 'ulti', 'dast', 'kadupu', 'kadupu noppi', 'kakkulu', 'vantulu'],
+    'chest': ['chest', 'heart', 'palpitation', 'palpitations', 'cardiac', 'pounding', 'seene', 'chhati', 'dil', 'gunde', 'gundelu', 'eduru'],
+    'breathing': ['breath', 'breathing', 'wheeze', 'wheezing', 'cough', 'shortness', 'suffocat', 'saans', 'khansi', 'saans lene me dikkat', 'swasam', 'dikkubadi', 'digubadi'],
+    'head': ['headache', 'dizzy', 'dizziness', 'vertigo', 'faint', 'numb', 'vision', 'migraine', 'seizure', 'convulsion', 'blurred', 'sir dard', 'chakkar', 'behosh', 'kamjori', 'tala noppi', 'tala tippu', 'tala tirugu', 'moorecha'],
+    'bone': ['knee', 'bone', 'joint', 'fall', 'fracture', 'back pain', 'sprain', 'swell', 'twist', 'injur', 'muscle', 'leg', 'arm', 'chot', 'haddi', 'gir', 'moch', 'sujan', 'noppi', 'eluku', 'elukula noppi', 'kaalu', 'cheyyi'],
+    'skin': ['rash', 'skin', 'itch', 'itching', 'burn', 'wound', 'boil', 'acne', 'hives', 'kharish', 'daag', 'jala', 'foda', 'ghav', 'durada', 'dappulu', 'gayam', 'gayalu'],
+    'ent': ['ear', 'throat', 'nose', 'hearing', 'sinus', 'tonsil', 'sore throat', 'kan dard', 'gala', 'naak', 'kan', 'chevi', 'chevi noppi', 'gonthu', 'mukku'],
+    'women': ['period', 'pregnancy', 'menstrual', 'vaginal', 'pregnant', 'cramps', 'mahwari', 'garbh', 'ruthuvu', 'garabham'],
+    'child': ['child', 'baby', 'toddler', 'infant', 'kid', 'bachcha', 'bachhe', 'bache', 'pilla', 'pilladu', 'papa', 'bidda'],
 }
 
 # Mirrors backend/src/constants/specialties.ts
@@ -92,12 +92,18 @@ QUESTIONS = _build_questions()
 
 
 def detect_categories(texts: list[str]) -> list[str]:
-    """Return detected categories in canonical CATEGORIES order."""
+    """Return detected categories in the order they appear in the text."""
     joined = ' ' + ' '.join(texts).lower() + ' '
-    found = set()
+    hits = []
     for cat in CATEGORIES:
         for kw in KEYWORDS[cat]:
-            if (' ' + kw + ' ') in joined or (' ' + kw + '.') in joined or (' ' + kw + ',') in joined or (' ' + kw) in joined:
-                found.add(cat)
-                break
-    return [c for c in CATEGORIES if c in found]
+            at = joined.find(' ' + kw)
+            if at == -1:
+                continue
+            after = joined[at + 1 + len(kw)]
+            if after and after not in (' ', '.', ',', '?', '!'):
+                continue
+            hits.append((at, cat))
+            break
+    hits.sort(key=lambda h: h[0])
+    return [cat for _, cat in hits]

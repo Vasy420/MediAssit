@@ -5,6 +5,7 @@ import { Patient } from '../models/Patient.js';
 import { Errors } from '../utils/ApiError.js';
 import { nextId } from '../utils/idGen.js';
 import { logger } from '../utils/logger.js';
+import { emitQueueUpdate } from './realtimeService.js';
 import type { QueueType } from '../models/Queue.js';
 import type { AppointmentType } from '../models/Appointment.js';
 import type { PatientType } from '../models/Patient.js';
@@ -75,7 +76,15 @@ export async function joinQueue(appointmentId: string) {
 
   await Appointment.updateOne({ appointment_id: appointmentId }, { status: 'in_queue' });
   logger.audit('queue-join', { queue_id: queue_token, appointment_id: appointmentId });
-  return toQueueView(queue.toObject(), null);
+
+  const view = toQueueView(queue.toObject(), null);
+  emitQueueUpdate(queue_token, {
+    queue_id: queue_token,
+    position: 1,
+    waiting_time: 0,
+    status: 'waiting',
+  });
+  return view;
 }
 
 export async function findQueue(queueId: string): Promise<QueueView> {
@@ -170,7 +179,14 @@ export async function updateQueueStatus(queueId: string, status: string): Promis
     await Appointment.updateOne({ appointment_id: queue.appointment_id }, { status: 'confirmed' });
   }
   logger.audit('queue-status-change', { queue_id: queueId, status });
-  return findQueue(queueId);
+  const updated = await findQueue(queueId);
+  emitQueueUpdate(queueId, {
+    queue_id: queueId,
+    position: updated.position,
+    waiting_time: updated.waiting_time,
+    status,
+  });
+  return updated;
 }
 
 export async function overridePriority(
