@@ -22,7 +22,16 @@
       "package": "com.medassist.plus"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "name": "MedAssist+",
+      "shortName": "MedAssist",
+      "description": "AI healthcare navigation and management",
+      "lang": "en",
+      "themeColor": "#14658C",
+      "backgroundColor": "#F4F8FB",
+      "display": "standalone",
+      "startUrl": "/"
     },
     "plugins": [
       "expo-router",

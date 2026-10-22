@@ -1,9 +1,8 @@
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { env } from './env.js';
 import { logger } from '../utils/logger.js';
 
-let memoryServer: MongoMemoryServer | null = null;
+let memoryServer: { getUri: (dbName?: string) => string; stop: () => Promise<boolean> } | null = null;
 
 export interface DbConnectionInfo {
   uri: string;
@@ -20,6 +19,7 @@ export async function connectDatabase(): Promise<DbConnectionInfo> {
 
   if (!uri) {
     logger.info('MONGODB_URI not set - starting in-memory MongoDB (development/testing)');
+    const { MongoMemoryServer } = await import('mongodb-memory-server');
     memoryServer = await MongoMemoryServer.create();
     uri = memoryServer.getUri(env.dbName);
     instanceName = 'in-memory-mongodb';

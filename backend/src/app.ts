@@ -24,7 +24,11 @@ export function createApp(): Express {
   const app = express();
 
   app.set('trust proxy', 1);
-  app.use(helmet());
+  app.use(helmet({
+    // The website is hosted on another origin. The default same-origin
+    // policy makes the browser drop API responses from that site.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }));
   app.use(
     cors({
       origin: env.corsOrigins.includes('*') ? true : env.corsOrigins,

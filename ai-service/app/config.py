@@ -42,7 +42,11 @@ class _Settings:
 
     def __init__(self) -> None:
         self.host: str = os.getenv('AI_SERVICE_HOST', '0.0.0.0')
-        self.port: int = _int_env('AI_SERVICE_PORT', 5001)
+        # Hosts such as Render set PORT. Local runs keep AI_SERVICE_PORT.
+        if os.getenv('PORT'):
+            self.port = _int_env('PORT', 5001)
+        else:
+            self.port = _int_env('AI_SERVICE_PORT', 5001)
         self.log_level: str = os.getenv('LOG_LEVEL', 'INFO')
         self.language: str = os.getenv('LANGUAGE', 'en')
 

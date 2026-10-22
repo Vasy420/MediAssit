@@ -1,0 +1,40 @@
+# Render Blueprint. Connect this repo, then set MONGODB_URI in the dashboard.
+# Free instances sleep when idle. The first request after sleep is slow,
+# and a sleeping API drops the live queue socket.
+services:
+  - type: web
+    name: medassist-ai
+    runtime: python
+    rootDir: ai-service
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+
+  - type: web
+    name: medassist-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DB_NAME
+        value: medassist
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: AI_SERVICE_URL
+        fromService:
+          type: web
+          name: medassist-ai
+          envVarKey: RENDER_EXTERNAL_URL
