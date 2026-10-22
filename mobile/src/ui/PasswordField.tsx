@@ -8,7 +8,8 @@ import { layout } from './theme';
 type PasswordFieldProps = Omit<TextFieldProps, 'secureTextEntry' | 'rightAccessory'>;
 
 export function PasswordField(props: PasswordFieldProps) {
-  const { theme } = useSettings();
+  const { theme: settingsTheme } = useSettings();
+  const theme = props.themeOverride ?? settingsTheme;
   const [visible, setVisible] = useState(false);
 
   return (

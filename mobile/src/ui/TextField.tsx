@@ -2,17 +2,19 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, type TextInputProps, type StyleProp, type ViewStyle, View } from 'react-native';
 import type { ReactNode } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
-import { layout, radii, spacing, typography } from './theme';
+import { layout, radii, spacing, typography, type ThemeColors } from './theme';
 
 export interface TextFieldProps extends TextInputProps {
   label?: string;
   containerStyle?: StyleProp<ViewStyle>;
   rightAccessory?: ReactNode;
   error?: string;
+  themeOverride?: ThemeColors;
 }
 
-export function TextField({ label, containerStyle, rightAccessory, error, ...props }: TextFieldProps) {
-  const { theme } = useSettings();
+export function TextField({ label, containerStyle, rightAccessory, error, themeOverride, ...props }: TextFieldProps) {
+  const { theme: settingsTheme } = useSettings();
+  const theme = themeOverride ?? settingsTheme;
   const [focused, setFocused] = useState(false);
   return (
     <View style={containerStyle}>

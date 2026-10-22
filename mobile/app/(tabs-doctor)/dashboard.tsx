@@ -160,7 +160,7 @@ export default function DoctorDashboardScreen() {
           )}
 
           <FadeSlide delay={280}>
-            <Button title="Manage queue" icon="list-outline" size="lg" style={styles.manageQueueBtn} onPress={() => router.push('/(tabs-doctor)/queue')} />
+            <Button title="Manage queue" icon="list-outline" size="lg" style={styles.manageQueueBtn} onPress={() => router.navigate('/(tabs-doctor)/queue')} />
           </FadeSlide>
         </>
       )}

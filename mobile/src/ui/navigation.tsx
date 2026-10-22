@@ -21,7 +21,9 @@ export function AppleBackButton({ label = 'Back' }: { label?: string }) {
         hitSlop={8}
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
-        onPress={() => router.back()}
+        onPress={() => {
+          if (router.canGoBack()) router.back();
+        }}
         style={({ pressed }) => [styles.back, pressed && styles.pressed]}
       >
         <Ionicons name="chevron-back" size={28} color={theme.primary} />

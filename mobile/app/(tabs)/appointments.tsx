@@ -149,7 +149,7 @@ export default function AppointmentsScreen() {
           <View style={styles.emptyView}>
             <Ionicons name="calendar-clear-outline" size={40} color={theme.inkSubtle} />
             <Text style={[styles.emptyText, { color: theme.inkSubtle }]}>No appointments yet.</Text>
-            <Button title="Find a doctor" icon="medical-outline" variant="secondary" onPress={() => router.push('/(tabs)/doctors')} />
+            <Button title="Find a doctor" icon="medical-outline" variant="secondary" onPress={() => router.navigate('/(tabs)/doctors')} />
           </View>
         </FadeSlide>
       }

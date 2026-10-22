@@ -79,8 +79,8 @@ export default function HomeScreen() {
       <FadeSlide delay={280}>
         <Text style={[styles.sectionTitle, { color: theme.ink }]}>What do you need?</Text>
         <ButtonStack>
-          <Button title="Check symptoms" icon="sparkles" size="lg" onPress={() => router.push('/(tabs)/ai-chat')} />
-          <Button title="Find a doctor" icon="medical-outline" variant="secondary" onPress={() => router.push('/(tabs)/doctors')} />
+          <Button title="Check symptoms" icon="sparkles" size="lg" onPress={() => router.navigate('/(tabs)/ai-chat')} />
+          <Button title="Find a doctor" icon="medical-outline" variant="secondary" onPress={() => router.navigate('/(tabs)/doctors')} />
           <Button title="Scan a paper report" icon="scan-outline" variant="secondary" onPress={() => router.push('/reports/scan')} />
           <Button title="Health timeline" icon="time-outline" variant="secondary" onPress={() => router.push('/timeline')} />
         </ButtonStack>

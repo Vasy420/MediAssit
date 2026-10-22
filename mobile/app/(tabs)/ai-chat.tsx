@@ -205,7 +205,7 @@ export default function AIChatScreen() {
           ) : null}
           <Text style={[styles.resultDisclaimer, { color: theme.inkSubtle }]}>{triage.disclaimer}</Text>
           {triage.recommended_specialties.length > 0 ? (
-            <Button title="Find a doctor" icon="medical-outline" style={styles.bookBtn} onPress={() => router.push('/(tabs)/doctors')} />
+            <Button title="Find a doctor" icon="medical-outline" style={styles.bookBtn} onPress={() => router.navigate('/(tabs)/doctors')} />
           ) : null}
         </BubbleIn>
       );
