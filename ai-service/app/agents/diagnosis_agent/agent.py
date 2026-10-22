@@ -213,6 +213,8 @@ def _llm_assist(payload: dict[str, Any], baseline: dict) -> dict | None:
             }, default=str),
             temperature=0.1,
             max_tokens=500,
+            timeout=18,
+            json_mode=True,
         )
         start, end = raw.find('{'), raw.rfind('}')
         if start < 0 or end <= start:
@@ -226,7 +228,8 @@ def _llm_assist(payload: dict[str, Any], baseline: dict) -> dict | None:
                 merged[key] = data[key]
         if merged.get('difficulty') == 'complex':
             merged['prescription'] = []
-        merged['model_used'] = 'llm-diagnosis'
+        from ...config import settings
+        merged['model_used'] = settings.llm_model or 'llm-diagnosis'
         return merged
     except Exception:
         return None

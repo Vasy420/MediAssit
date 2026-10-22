@@ -54,7 +54,7 @@ class _Settings:
         self.llm_api_url: str = os.getenv('LLM_API_URL', '').strip()
         self.llm_api_key: str = os.getenv('LLM_API_KEY', '').strip()
         self.llm_model: str = os.getenv('LLM_MODEL', '').strip()
-        self.llm_timeout: float = _float_env('LLM_TIMEOUT_SECONDS', 30)
+        self.llm_timeout: float = _float_env('LLM_TIMEOUT_SECONDS', 20)
 
         self.service_name: str = 'medassist-ai'
         self.version: str = '1.0.0'

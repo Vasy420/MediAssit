@@ -60,7 +60,13 @@ def _llm_summary(text: str, diagnosis: str) -> dict | None:
         + '\nReturn only valid JSON.'
     )
     try:
-        raw = llm.chat_completion(system=instruction, user=user, max_tokens=600)
+        raw = llm.chat_completion(
+            system=instruction,
+            user=user,
+            max_tokens=600,
+            timeout=18,
+            json_mode=True,
+        )
     except Exception as exc:  # network / provider errors are non-fatal
         logger.warning('LLM summary failed, using extractive fallback: %s', exc)
         return None

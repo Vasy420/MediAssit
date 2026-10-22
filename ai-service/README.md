@@ -58,14 +58,15 @@ To use a real language model, point `LLM_API_URL` at any OpenAI-compatible
 endpoint:
 
 ```dotenv
-LLM_API_URL=http://127.0.0.1:11434/v1/chat/completions   # Ollama
-LLM_API_KEY=sk-...
-LLM_MODEL=gpt-4o-mini
+LLM_API_URL=https://api.groq.com/openai/v1/chat/completions
+LLM_API_KEY=
+LLM_MODEL=openai/gpt-oss-120b
 ```
 
-When configured, the report agent tries the LLM first and falls back to the
-extractive summarizer; the triage conversation always uses the deterministic
-engine (safety-first, consistent wording).
+When configured, report summary, pre-consult notes, and diagnosis assist call
+the model first and fall back to the offline text if it fails. Symptom chat
+still follows the question tree. The model may rephrase the question sentence
+and the final reason. It does not change the buttons, urgency, or specialty.
 
 ## Tests
 

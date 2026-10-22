@@ -509,6 +509,7 @@ def build_clinical_summary(summary: dict, patient_context: Optional[dict] = None
                 user=text,
                 temperature=0.1,
                 max_tokens=280,
+                timeout=18,
             ).strip()
             if polished:
                 return polished

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import urllib.error
 import urllib.request
 from typing import Any
@@ -18,28 +19,41 @@ from ..config import settings
 logger = logging.getLogger('medassist-ai.llm')
 
 DEFAULT_URL = 'http://127.0.0.1:11434/v1/chat/completions'
+_THINK = re.compile(r'<think>.*?</think>', re.IGNORECASE | re.DOTALL)
 
 
 def is_configured() -> bool:
-    return bool(settings.llm_api_url.strip() or settings.llm_model.strip())
+    url = settings.llm_api_url.strip()
+    # A Groq URL without a key only produces 401s. Stay on the offline agents.
+    if 'groq.com' in url.lower() and not settings.llm_api_key.strip():
+        return False
+    return bool(url or settings.llm_model.strip())
 
 
 def effective_model() -> str:
     return settings.llm_model or 'medassist-default'
 
 
-def chat_completion(
+def _safe_error(text: str) -> str:
+    key = settings.llm_api_key.strip()
+    if key:
+        text = text.replace(key, '[redacted]')
+    return text[:300]
+
+
+def _visible_answer(text: str) -> str:
+    return _THINK.sub('', text).strip()
+
+
+def _complete(
     system: str,
     user: str,
     *,
-    temperature: float = 0.2,
-    max_tokens: int = 600,
-    timeout: float | None = None,
+    temperature: float,
+    max_tokens: int,
+    timeout: float | None,
+    json_mode: bool,
 ) -> str:
-    """Call the OpenAI-compatible endpoint and return the assistant text.
-
-    Raises on network or shape errors so callers can fall back gracefully.
-    """
     url = settings.llm_api_url or DEFAULT_URL
     payload: dict[str, Any] = {
         'model': effective_model(),
@@ -50,7 +64,19 @@ def chat_completion(
         'temperature': temperature,
         'max_tokens': max_tokens,
     }
-    headers = {'Content-Type': 'application/json'}
+    # GPT-OSS puts a reasoning trace beside the answer. Ask for the answer only,
+    # and keep the trace short so a chat turn finishes inside the API timeout.
+    if 'groq.com' in url.lower():
+        payload['reasoning_effort'] = 'low'
+        payload['include_reasoning'] = False
+    if json_mode:
+        payload['response_format'] = {'type': 'json_object'}
+
+    # Cloudflare rejects Python's default urllib signature with error 1010.
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'medassist-ai/1.0',
+    }
     if settings.llm_api_key:
         headers['Authorization'] = 'Bearer ' + settings.llm_api_key
 
@@ -60,12 +86,54 @@ def chat_completion(
         with urllib.request.urlopen(request, timeout=timeout or settings.llm_timeout) as response:
             raw = response.read().decode('utf-8')
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f'LLM HTTP {exc.code}: {exc.read().decode("utf-8", errors="replace")[:300]}') from exc
+        detail = _safe_error(exc.read().decode('utf-8', errors='replace'))
+        raise RuntimeError(f'LLM HTTP {exc.code}: {detail}') from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f'LLM unreachable: {exc.reason}') from exc
 
     data = json.loads(raw)
     try:
-        return str(data['choices'][0]['message']['content'])
+        content = _visible_answer(str(data['choices'][0]['message']['content'] or ''))
     except (KeyError, IndexError, TypeError) as exc:
         raise RuntimeError('Unexpected LLM response shape') from exc
+    if not content:
+        raise RuntimeError('LLM returned empty content')
+    return content
+
+
+def chat_completion(
+    system: str,
+    user: str,
+    *,
+    temperature: float = 0.2,
+    max_tokens: int = 600,
+    timeout: float | None = None,
+    json_mode: bool = False,
+) -> str:
+    """Call the OpenAI-compatible endpoint and return the assistant text.
+
+    Raises on network or shape errors so callers can fall back gracefully.
+    A JSON-mode rejection is retried once as plain text. Callers already
+    extract a JSON object from that text.
+    """
+    try:
+        return _complete(
+            system,
+            user,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=timeout,
+            json_mode=json_mode,
+        )
+    except RuntimeError as exc:
+        if json_mode and 'HTTP 400' in str(exc):
+            logger.warning('LLM JSON mode was rejected; retrying as plain text')
+            return _complete(
+                system,
+                user,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=timeout,
+                json_mode=False,
+            )
+        raise

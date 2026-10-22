@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from ..agents.triage_agent import next_chat_turn
+from ..agents.triage_agent.wording import polish_turn
 from ..schemas import ChatRequest
 
 router = APIRouter(prefix='/ai', tags=['ai'])
@@ -11,12 +12,14 @@ router = APIRouter(prefix='/ai', tags=['ai'])
 
 def _run_turn(req: ChatRequest) -> dict:
     patient = req.patient_context.model_dump() if req.patient_context else None
-    return next_chat_turn(
-        messages=[{'role': m.role, 'text': m.text} for m in req.messages],
+    messages = [{'role': m.role, 'text': m.text} for m in req.messages]
+    turn = next_chat_turn(
+        messages=messages,
         answers=[{'key': a.key, 'answer': a.answer, 'rephrased': a.rephrased} for a in req.answers],
         patient=patient,
         simple=req.simple,
     )
+    return polish_turn(turn, messages)
 
 
 @router.post('/chat')

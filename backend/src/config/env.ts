@@ -23,7 +23,7 @@ export const env = {
   mongodbUri: (process.env.MONGODB_URI ?? '').trim(),
   dbName: process.env.DB_NAME ?? 'medassist',
   aiServiceUrl: stripTrailingSlash(process.env.AI_SERVICE_URL ?? 'http://127.0.0.1:5001'),
-  aiServiceTimeoutMs: num(process.env.AI_SERVICE_TIMEOUT_MS, 8000),
+  aiServiceTimeoutMs: num(process.env.AI_SERVICE_TIMEOUT_MS, 25000),
   expoAccessToken: process.env.EXPO_ACCESS_TOKEN ?? '',
   rateLimitWindowMs: num(process.env.RATE_LIMIT_WINDOW_MS, 60000),
   rateLimitMax: num(process.env.RATE_LIMIT_MAX, 100),

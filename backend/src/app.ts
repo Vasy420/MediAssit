@@ -47,7 +47,7 @@ export function createApp(): Express {
   app.use('/api', limiter);
 
   app.get('/', (_req, res) => {
-    res.json({ name: 'MedAssist+ API', version: '1.0.0', docs: '/api/health' });
+    res.json({ name: 'MedAssist+ API', version: '1.0.0', docs: '/api/ai/health' });
   });
 
   app.use('/api/auth', authRouter);
