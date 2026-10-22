@@ -336,7 +336,7 @@ export default function AIChatScreen() {
             <BubbleIn side="bot">
               <View style={[styles.typingRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                 <TypingDots />
-                <Text style={[styles.typing, { color: theme.inkSubtle }]}>Reviewing your answers…</Text>
+                <Text style={[styles.typing, { color: theme.inkSubtle }]}>Thinking…</Text>
               </View>
             </BubbleIn>
           ) : null}

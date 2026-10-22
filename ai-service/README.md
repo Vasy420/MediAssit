@@ -65,8 +65,10 @@ LLM_MODEL=openai/gpt-oss-120b
 
 When configured, report summary, pre-consult notes, and diagnosis assist call
 the model first and fall back to the offline text if it fails. Symptom chat
-still follows the question tree. The model may rephrase the question sentence
-and the final reason. It does not change the buttons, urgency, or specialty.
+still follows the question tree. The model replies in a short chat: it
+responds to what the patient said, then asks the same next question. The
+closing note is a short message with the same guidance. Buttons, urgency,
+and specialty do not change.
 
 ## Tests
 

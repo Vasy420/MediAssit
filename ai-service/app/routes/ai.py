@@ -19,7 +19,7 @@ def _run_turn(req: ChatRequest) -> dict:
         patient=patient,
         simple=req.simple,
     )
-    return polish_turn(turn, messages)
+    return polish_turn(turn, messages, simple=bool(req.simple))
 
 
 @router.post('/chat')

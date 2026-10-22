@@ -1,34 +1,45 @@
-"""Rewrite patient-facing sentences with Groq. The question tree stays in charge.
+"""Let Groq talk like a short clinic chat. The question tree stays in charge.
 
-Only the question sentence and the final reason may change. Option ids,
-urgency, the emergency flag, and specialties are copied through untouched.
-Any failure, including a slow or empty model reply, keeps the original sentence.
+A question turn may become two or three sentences: a reply to what the patient
+just said, then the same question. A result may become a short closing message
+with the same guidance. Option ids, urgency, the emergency flag, and specialties
+stay untouched. A failed, slow, or off-script reply keeps the original text.
 """
 from __future__ import annotations
 
 import logging
+import re
 
 from ...services import llm
 
 logger = logging.getLogger('medassist-ai.wording')
 
 _POLISH_TIMEOUT = 8.0
-_MAX_CHARS = 400
+_MAX_CHARS = 520
+_SENTENCE_END = re.compile(r'[.!?]+')
 
 _QUESTION_SYSTEM = (
-    'You rewrite one question a clinic app shows to a patient. '
-    'The question and its answer buttons are already chosen. '
-    'Rewrite only the question sentence so it is clear and refers to what the patient already said. '
-    'Do not add advice, a diagnosis, a medicine, or a second question. '
-    'Return only the sentence, with no quotes.'
+    'You are a clinic chat assistant. The next question and its answer buttons are already chosen. '
+    'Write two short sentences, like a person texting. '
+    'First, reply to what the patient just said, without adding symptoms, advice, a diagnosis, or a medicine. '
+    'Second, ask the required question in plain language. It must mean the same thing, so the buttons still answer it. '
+    'Do not ask a different question. Return only those sentences, with no quotes.'
+)
+
+_SIMPLE_QUESTION_SYSTEM = (
+    'You are a clinic chat assistant using very easy words. '
+    'Write at most two short sentences. '
+    'First, show you heard the patient. Second, ask the required question. '
+    'Do not add advice, a diagnosis, a medicine, or a different question. '
+    'Return only those sentences.'
 )
 
 _REASON_SYSTEM = (
-    'You rewrite the explanation a clinic app shows after a symptom check-in. '
-    'The urgency decision is already made and must stay the same. '
-    'Rewrite only the reason in one or two plain sentences, using the symptoms the patient reported. '
-    'Do not prescribe, do not add symptoms, and do not change how urgent it is. '
-    'Return only the reason, with no quotes.'
+    'You are a clinic chat assistant closing a symptom check. '
+    'Write two or three short sentences to the patient. '
+    'Start from what they told you, then give the same care guidance as the reason below. '
+    'Do not make it more or less urgent. Do not prescribe, and do not add symptoms. '
+    'Return only those sentences, with no quotes.'
 )
 
 
@@ -44,27 +55,46 @@ def _patient_lines(messages: list[dict]) -> str:
     return '\n'.join(lines[-4:])
 
 
-def _clean(text: str) -> str:
+def _option_labels(question: dict) -> str:
+    labels: list[str] = []
+    for option in question.get('options') or []:
+        if not isinstance(option, dict):
+            continue
+        label = ' '.join(str(option.get('text') or '').split())
+        if label:
+            labels.append(label)
+    return ', '.join(labels[:8])
+
+
+def _clean(text: str, *, require_question: bool) -> str:
     sentence = ' '.join(text.replace('\n', ' ').split()).strip().strip('"').strip("'")
     if not sentence or sentence.startswith('{') or sentence.startswith('```'):
         return ''
     if len(sentence) < 8 or len(sentence) > _MAX_CHARS:
         return ''
+    if require_question and '?' not in sentence:
+        return ''
+    endings = _SENTENCE_END.findall(sentence)
+    if not endings or len(endings) > 4:
+        return ''
+    lowered = sentence.lower()
+    if 'diagnos' in lowered or 'prescri' in lowered:
+        return ''
     return sentence
 
 
-def _rewrite(system: str, user: str) -> str:
+def _rewrite(system: str, user: str, *, require_question: bool) -> str:
     return _clean(llm.chat_completion(
         system=system,
         user=user,
-        temperature=0.2,
-        max_tokens=160,
+        temperature=0.4,
+        max_tokens=220,
         timeout=_POLISH_TIMEOUT,
-    ))
+    ), require_question=require_question)
 
 
-def polish_turn(turn: dict, messages: list[dict]) -> dict:
-    """Return the same turn, with patient-facing text rewritten when Groq is available."""
+def polish_turn(turn: dict, messages: list[dict], simple: bool = False) -> dict:
+    """Return the same turn, with a short chat reply when Groq is available."""
     if not llm.is_configured() or not isinstance(turn, dict):
         return turn
     try:
@@ -73,9 +103,15 @@ def polish_turn(turn: dict, messages: list[dict]) -> dict:
             original = str(turn['question'].get('text') or '').strip()
             if not original:
                 return turn
+            buttons = _option_labels(turn['question'])
             rewritten = _rewrite(
-                _QUESTION_SYSTEM,
-                f'Question: {original}\n\nWhat the patient already said:\n{said or "(nothing yet)"}',
+                _SIMPLE_QUESTION_SYSTEM if simple else _QUESTION_SYSTEM,
+                (
+                    f'Required question: {original}\n'
+                    f'Buttons: {buttons or "(none)"}\n\n'
+                    f'What the patient already said:\n{said or "(nothing yet)"}'
+                ),
+                require_question=True,
             )
             if rewritten:
                 turn['question']['text'] = rewritten
@@ -93,9 +129,10 @@ def polish_turn(turn: dict, messages: list[dict]) -> dict:
                     f'Reason: {original}\n\n'
                     f'What the patient said:\n{said or "(nothing yet)"}'
                 ),
+                require_question=False,
             )
             if rewritten:
                 triage['reason'] = rewritten
     except Exception as exc:
-        logger.warning('Symptom wording kept the original sentence: %s', exc.__class__.__name__)
+        logger.warning('Symptom chat kept the original wording: %s', exc.__class__.__name__)
     return turn

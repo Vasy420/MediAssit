@@ -35,16 +35,29 @@ def test_offline_wording_keeps_the_question(monkeypatch):
     assert turn['question']['options'][0]['id'] == 'little'
 
 
-def test_groq_rewrites_only_the_question_sentence(monkeypatch):
+def test_groq_replies_in_chat_then_asks_the_same_question(monkeypatch):
+    monkeypatch.setattr('app.agents.triage_agent.wording.llm.is_configured', lambda: True)
+
+    def _reply(**kwargs):
+        assert 'Buttons: A little' in kwargs['user']
+        return 'A sore throat is a rough way to start the day. How painful is it right now?'
+
+    monkeypatch.setattr('app.agents.triage_agent.wording.llm.chat_completion', _reply)
+    turn = polish_turn(_question(), [{'role': 'user', 'text': 'I have a sore throat'}])
+    assert turn['question']['text'].startswith('A sore throat')
+    assert '?' in turn['question']['text']
+    assert turn['question']['id'] == 'Q_ent_sev'
+    assert turn['question']['options'][0]['key'] == 'Q_ent_sev.little'
+
+
+def test_chat_reply_without_the_question_is_rejected(monkeypatch):
     monkeypatch.setattr('app.agents.triage_agent.wording.llm.is_configured', lambda: True)
     monkeypatch.setattr(
         'app.agents.triage_agent.wording.llm.chat_completion',
-        lambda **_kwargs: 'How painful is that sore throat right now?',
+        lambda **_kwargs: 'I am sorry you are dealing with that.',
     )
     turn = polish_turn(_question(), [{'role': 'user', 'text': 'I have a sore throat'}])
-    assert turn['question']['text'] == 'How painful is that sore throat right now?'
-    assert turn['question']['id'] == 'Q_ent_sev'
-    assert turn['question']['options'][0]['key'] == 'Q_ent_sev.little'
+    assert turn['question']['text'] == 'How bad is the sore throat?'
 
 
 def test_groq_rewrites_only_the_reason(monkeypatch):
