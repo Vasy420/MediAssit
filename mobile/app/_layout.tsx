@@ -6,6 +6,7 @@ import { SourceSerif4_600SemiBold, SourceSerif4_700Bold } from '@expo-google-fon
 import { AuthProvider } from '../src/contexts/AuthContext';
 import { SettingsProvider } from '../src/contexts/SettingsContext';
 import { useSettings } from '../src/contexts/SettingsContext';
+import { DesktopFrame } from '../src/ui/DesktopFrame';
 import { appleStackScreenOptions, AppleBackButton } from '../src/ui/navigation';
 import { isDarkTheme } from '../src/ui/theme';
 
@@ -40,7 +41,7 @@ function RootStack() {
   const stack = appleStackScreenOptions(theme);
 
   return (
-    <>
+    <DesktopFrame background={theme.background} canvas={theme.surfaceMuted}>
       <StatusBar style={isDarkTheme(themeName) ? 'light' : 'dark'} backgroundColor={theme.background} />
       <Stack screenOptions={{ ...stack, headerShown: false }}>
         <Stack.Screen name="(auth)" />
@@ -119,6 +120,6 @@ function RootStack() {
           }}
         />
       </Stack>
-    </>
+    </DesktopFrame>
   );
 }
