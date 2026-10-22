@@ -15,6 +15,11 @@ export async function handleHealth(req: Request, res: Response) {
   res.json({ success: true, data: { status: 'ok', ai_service: aiOnline ? 'online' : 'offline' } });
 }
 
+export async function handleWake(req: Request, res: Response) {
+  const aiOnline = await aiServiceHealthy(45000);
+  res.json({ success: true, data: { status: 'ok', ai_service: aiOnline ? 'online' : 'offline' } });
+}
+
 export async function handleChat(req: Request, res: Response) {
   const patient = await getPatientForUser(req.user!.user_id);
   if (!patient) throw Errors.forbidden('Patient profile not found');

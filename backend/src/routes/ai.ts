@@ -2,11 +2,12 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
-import { handleChat, handleHealth, handleTriage } from '../controllers/aiController.js';
+import { handleChat, handleHealth, handleTriage, handleWake } from '../controllers/aiController.js';
 
 export const aiRouter = Router();
 
 aiRouter.get('/health', requireAuth, handleHealth);
+aiRouter.post('/wake', requireAuth, handleWake);
 aiRouter.post(
   '/chat',
   requireAuth,

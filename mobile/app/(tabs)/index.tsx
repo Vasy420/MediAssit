@@ -10,6 +10,7 @@ import { ButtonStack } from '../../src/ui/ButtonStack';
 import { Card } from '../../src/ui/Card';
 import { FadeSlide, PopOnChange, ScaleIn } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
+import { ServerStatus } from '../../src/ui/ServerStatus';
 import { layout, radii, spacing, typography } from '../../src/ui/theme';
 
 interface DashboardStats {
@@ -55,6 +56,7 @@ export default function HomeScreen() {
         <View style={styles.greeting}>
           <Text style={[styles.greetingText, { color: theme.ink }]}>{greeting}, {user?.name?.split(' ')[0] || 'Patient'}</Text>
           <Text style={[styles.dateText, { color: theme.inkMuted }]}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+          <ServerStatus />
         </View>
       </ScaleIn>
 
@@ -94,7 +96,7 @@ const styles = StyleSheet.create({
   content: { padding: layout.horizontalPadding, paddingBottom: 40 },
   greeting: { marginBottom: spacing.xl, marginTop: spacing.sm },
   greetingText: { ...typography.display, fontSize: 26, lineHeight: 32 },
-  dateText: { ...typography.body, marginTop: spacing.xs },
+  dateText: { ...typography.body, marginTop: spacing.xs, marginBottom: spacing.sm },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xxxl },
   statCard: { flex: 1, alignItems: 'flex-start' },
   statIcon: { width: 30, height: 30, borderRadius: radii.sm, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },

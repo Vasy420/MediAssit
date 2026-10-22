@@ -38,10 +38,10 @@ async function post(path: string, body: unknown): Promise<unknown> {
   }
 }
 
-export async function aiServiceHealthy(): Promise<boolean> {
+export async function aiServiceHealthy(timeoutMs = 1500): Promise<boolean> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 1500);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     const res = await fetch(env.aiServiceUrl + '/health', { signal: controller.signal });
     clearTimeout(timer);
     return res.ok;

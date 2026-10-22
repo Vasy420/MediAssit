@@ -10,6 +10,7 @@ import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
 import { FadeSlide, Stagger } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
+import { ServerStatus } from '../../src/ui/ServerStatus';
 import { StatusBadge } from '../../src/ui/StatusBadge';
 import { colors, layout, spacing, typography } from '../../src/ui/theme';
 
@@ -90,6 +91,7 @@ export default function DoctorDashboardScreen() {
       <FadeSlide>
         <View style={styles.greetingRow}>
           <Text style={[styles.greeting, { color: theme.ink }]}>Welcome, Dr. {user?.name ?? ''}</Text>
+          <ServerStatus />
           {testMode && <StatusBadge label="Fake test data" tone="warning" />}
         </View>
       </FadeSlide>

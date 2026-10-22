@@ -18,7 +18,7 @@ def test_retired_llama_model_is_replaced(monkeypatch):
 
     monkeypatch.setattr(settings, 'llm_api_url', 'https://api.groq.com/openai/v1/chat/completions')
     monkeypatch.setattr(settings, 'llm_model', 'llama-3.3-70b-versatile')
-    assert effective_model() == 'openai/gpt-oss-120b'
+    assert effective_model() == 'openai/gpt-oss-20b'
 
 
 def test_groq_with_a_key_is_configured(monkeypatch):

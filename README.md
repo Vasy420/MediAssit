@@ -122,7 +122,7 @@ Opens Expo dev tools. Press `w` for web, scan QR for mobile (Expo Go app).
 | `AI_SERVICE_PORT` | `5001` | Service port |
 | `LLM_API_URL` | (empty) | OpenAI-compatible API URL |
 | `LLM_API_KEY` | (empty) | API key for LLM |
-| `LLM_MODEL` | (empty) | Model name (Groq: `openai/gpt-oss-120b`) |
+| `LLM_MODEL` | (empty) | Model name (Groq: `openai/gpt-oss-20b`) |
 
 ---
 

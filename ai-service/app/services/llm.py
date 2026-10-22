@@ -32,10 +32,10 @@ def is_configured() -> bool:
 
 # These ids 404 on a normal Groq key. Llama 3.3 70B is enterprise-only.
 _RETIRED_GROQ_MODELS = {
-    'llama-3.3-70b-versatile': 'openai/gpt-oss-120b',
+    'llama-3.3-70b-versatile': 'openai/gpt-oss-20b',
     'llama-3.1-8b-instant': 'openai/gpt-oss-20b',
 }
-_GROQ_DEFAULT = 'openai/gpt-oss-120b'
+_GROQ_DEFAULT = 'openai/gpt-oss-20b'
 
 
 def effective_model() -> str:

@@ -10,6 +10,7 @@ import { useSettings } from '../../src/contexts/SettingsContext';
 import { Button } from '../../src/ui/Button';
 import { BubbleIn, FadeSlide, ScaleIn, TypingDots } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
+import { ServerStatus } from '../../src/ui/ServerStatus';
 import { StatusBadge } from '../../src/ui/StatusBadge';
 import { fonts, layout, radii, spacing, typography } from '../../src/ui/theme';
 import {
@@ -264,7 +265,9 @@ export default function AIChatScreen() {
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
-            started ? (
+            <View>
+            <ServerStatus />
+            {started ? (
               <Pressable
                 style={[
                   styles.simpleToggle,
@@ -330,7 +333,8 @@ export default function AIChatScreen() {
                   ))}
                 </View>
               </View>
-            )
+            )}
+            </View>
           }
           ListFooterComponent={loading ? (
             <BubbleIn side="bot">

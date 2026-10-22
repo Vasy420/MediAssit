@@ -60,7 +60,7 @@ endpoint:
 ```dotenv
 LLM_API_URL=https://api.groq.com/openai/v1/chat/completions
 LLM_API_KEY=
-LLM_MODEL=openai/gpt-oss-120b
+LLM_MODEL=openai/gpt-oss-20b
 ```
 
 When configured, report summary, pre-consult notes, and diagnosis assist call
