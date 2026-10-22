@@ -30,8 +30,23 @@ def is_configured() -> bool:
     return bool(url or settings.llm_model.strip())
 
 
+# These ids 404 on a normal Groq key. Llama 3.3 70B is enterprise-only.
+_RETIRED_GROQ_MODELS = {
+    'llama-3.3-70b-versatile': 'openai/gpt-oss-120b',
+    'llama-3.1-8b-instant': 'openai/gpt-oss-20b',
+}
+_GROQ_DEFAULT = 'openai/gpt-oss-120b'
+
+
 def effective_model() -> str:
-    return settings.llm_model or 'medassist-default'
+    model = settings.llm_model.strip()
+    if 'groq.com' not in settings.llm_api_url.lower():
+        return model or 'medassist-default'
+    replacement = _RETIRED_GROQ_MODELS.get(model)
+    if replacement:
+        logger.warning('Groq model %s is retired; using %s', model, replacement)
+        return replacement
+    return model or _GROQ_DEFAULT
 
 
 def _safe_error(text: str) -> str:
