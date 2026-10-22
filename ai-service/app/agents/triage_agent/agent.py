@@ -49,7 +49,7 @@ SYMPTOM_PHRASES = [
 
 
 def patient_texts(messages: list[dict]) -> list[str]:
-    return [m['text'] for m in messages if m.get('role') == 'patient']
+    return [m['text'] for m in messages if m.get('role') in ('patient', 'user') and m.get('text')]
 
 
 def word_list(texts: list[str]) -> str:
@@ -285,7 +285,7 @@ def build_category_fallback_question(simple: bool = False) -> dict:
 
 
 def build_fallback_general(simple: bool = False) -> dict:
-    return {
+    result = {
         'symptoms': [],
         'duration': {'label': 'Not clear yet' if simple else 'Duration not clear yet'},
         'severity': {'level': 'mild', 'label': SEVERITY_LABEL['mild']},
@@ -301,6 +301,7 @@ def build_fallback_general(simple: bool = False) -> dict:
         ) if simple else lang.t('fallback_reason', _fallback='We could not identify a specific problem. Please start with a general physician.'),
         'disclaimer': DISCLAIMER,
     }
+    return _with_care(result, [], [], simple)
 
 
 # ------------------- free-text answer extraction -------------------
@@ -415,6 +416,73 @@ def extract_answers(texts: list[str], cats: list[str]) -> list[dict]:
     return out
 
 
+_HOME_STEPS = {
+    'fever': [
+        'Rest and drink water often.',
+        'Keep the room cool and wear light clothes.',
+        'See a doctor if the fever lasts more than two days, gets very high, or comes with a stiff neck, rash, confusion, or trouble breathing.',
+    ],
+    'stomach': [
+        'Take small sips of water and eat plain food if you can.',
+        'Rest until the pain settles.',
+        'See a doctor if the pain is severe, you cannot keep fluids down, or there is blood.',
+    ],
+    'head': [
+        'Rest in a quiet room and drink water.',
+        'See a doctor if the headache is sudden and severe, or comes with vision changes, weakness, or a stiff neck.',
+    ],
+    'ent': [
+        'Rest, drink water, and avoid smoke and dust.',
+        'See a doctor if swallowing becomes hard, the pain is only on one side, or it is not better in a few days.',
+    ],
+    'general': [
+        'Rest and drink water.',
+        'See a doctor if it gets worse, spreads, or is not better in two days.',
+    ],
+}
+
+_CARE_LINE = {
+    'home': 'Look after this at home unless it gets worse.',
+    'doctor': 'Book a doctor appointment.',
+    'emergency': 'This needs urgent care, not a routine home plan.',
+}
+
+
+def _with_care(result: dict, texts: list[str], cats: list[str], simple: bool) -> dict:
+    urgency = str((result.get('urgency') or {}).get('level') or 'green')
+    if urgency == 'red':
+        setting = 'emergency'
+    elif urgency in ('orange', 'yellow'):
+        setting = 'doctor'
+    else:
+        setting = 'home'
+    steps = []
+    if setting == 'home':
+        steps = list(_HOME_STEPS.get(cats[0] if cats else '', _HOME_STEPS['general']))
+        if not simple:
+            result['reason'] = (
+                'This looks like something you can look after at home for now. '
+                + str(result.get('reason') or '')
+            ).strip()
+    said = ' '.join(text.strip() for text in texts if text and text.strip())
+    names = ', '.join(item.get('name', '') for item in result.get('symptoms') or [] if item.get('name'))
+    if not names:
+        names = ', '.join(cats) or 'not named'
+    severity = str((result.get('severity') or {}).get('label') or 'Not clear')
+    duration = str((result.get('duration') or {}).get('label') or 'Not clear')
+    specialties = result.get('recommended_specialties') or []
+    specialty = specialties[0].get('specialty') if specialties else 'General Physician'
+    warnings = ' '.join(result.get('warning_signs') or []) or 'None reported.'
+    result['care'] = {'setting': setting, 'steps': steps}
+    result['ai_summary'] = (
+        f'Patient said: {said or "No description yet."} '
+        f'Symptoms: {names}. Severity: {severity}. Duration: {duration}. '
+        f'Decision: {_CARE_LINE[setting]} '
+        f'Suggested specialty: {specialty}. Warning signs: {warnings}'
+    )
+    return result
+
+
 def merge_answers(answers: list[dict], extracted: list[dict]) -> list[dict]:
     merged = [dict(a) for a in answers]
     for e in extracted:
@@ -456,17 +524,20 @@ def build_result(cats: list[str], answers: list[dict], texts: list[str], patient
     else:
         reason = lang.t('reason.routine')
 
-    return {
-        'symptoms': extract_symptoms(texts),
+    symptoms = extract_symptoms(texts)
+    specialties = compute_specialties(cats, patient)
+    result = {
+        'symptoms': symptoms,
         'duration': onset,
         'severity': {'level': sev_level, 'label': SEVERITY_LABEL[sev_level]},
         'urgency': {'level': urgency, 'label': URGENCY_LABEL[urgency]},
-        'recommended_specialties': compute_specialties(cats, patient),
+        'recommended_specialties': specialties,
         'emergency_flag': urgency == 'red',
         'warning_signs': warn_signs,
         'reason': reason,
         'disclaimer': DISCLAIMER,
     }
+    return _with_care(result, texts, cats, simple)
 
 
 REASON_SIMPLE_FALLBACK = {

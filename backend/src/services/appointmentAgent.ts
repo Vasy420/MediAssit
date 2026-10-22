@@ -1,5 +1,6 @@
 import { Doctor } from '../models/Doctor.js';
 import { Appointment } from '../models/Appointment.js';
+import { Conversation } from '../models/Conversation.js';
 import { Queue } from '../models/Queue.js';
 import { Errors } from '../utils/ApiError.js';
 import { nextId } from '../utils/idGen.js';
@@ -15,6 +16,14 @@ export interface BookAppointmentInput {
   hospital?: string;
   reason?: string;
   urgency?: 'green' | 'yellow' | 'orange' | 'red';
+  conversation_id?: string;
+  ai_summary?: string;
+}
+
+function chatSummary(value: unknown): string {
+  if (!value || typeof value !== 'object') return '';
+  const summary = (value as { ai_summary?: unknown }).ai_summary;
+  return typeof summary === 'string' ? summary.trim() : '';
 }
 
 export async function bookAppointment(input: BookAppointmentInput) {
@@ -38,6 +47,14 @@ export async function bookAppointment(input: BookAppointmentInput) {
 
   const appointment_id = await nextId('A');
   const inherited = input.urgency ?? (await latestPatientUrgency(input.patient_id)) ?? 'green';
+  let aiSummary = (input.ai_summary ?? '').trim();
+  if (!aiSummary && input.conversation_id) {
+    const conversation = await Conversation.findOne({
+      conversation_id: input.conversation_id,
+      patient_id: input.patient_id,
+    }).lean();
+    aiSummary = chatSummary(conversation?.triage_result);
+  }
   const appointment = await Appointment.create({
     appointment_id,
     patient_id: input.patient_id,
@@ -46,6 +63,7 @@ export async function bookAppointment(input: BookAppointmentInput) {
     time: input.time,
     hospital: input.hospital ?? '',
     reason: input.reason ?? '',
+    ai_summary: aiSummary.slice(0, 2000),
     urgency: inherited,
     status: 'scheduled',
   });

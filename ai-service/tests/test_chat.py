@@ -59,4 +59,42 @@ def test_chest_pain_sweating_flags_emergency(client):
     triage = turn['triage']
     assert triage['urgency']['level'] == 'red'
     assert triage['emergency_flag'] is True
+    assert triage['care']['setting'] == 'emergency'
     assert 'emergency' in triage['reason'].lower()
+
+
+def test_named_fever_skips_the_category_buttons(client):
+    res = client.post('/ai/chat', json={
+        'messages': [{'role': 'patient', 'text': 'I have a fever'}],
+        'answers': [],
+    })
+    data = res.json()
+    assert data['type'] == 'question'
+    assert data['question']['id'] == 'Q_fever_severity'
+    assert data['question']['text'] == 'How bad do you feel with the fever?'
+    assert data['question']['options'][0]['id'] == 'little'
+
+
+def test_mild_fever_finishes_with_home_care_and_a_summary(client):
+    messages = [{'role': 'patient', 'text': 'I have a fever'}]
+    answers: list[dict] = []
+    turn = client.post('/ai/chat', json={'messages': messages, 'answers': answers}).json()
+    assert turn['question']['id'] == 'Q_fever_severity'
+
+    answers.append({'key': 'Q_fever_severity', 'answer': 'little'})
+    turn = client.post('/ai/chat', json={'messages': messages, 'answers': answers}).json()
+    assert turn['question']['id'] == 'Q_fever_onset'
+
+    answers.append({'key': 'Q_fever_onset', 'answer': 'today'})
+    turn = client.post('/ai/chat', json={'messages': messages, 'answers': answers}).json()
+    assert turn['question']['id'] == 'Q_fever_assoc'
+
+    answers.append({'key': 'Q_fever_assoc', 'answer': 'chills'})
+    turn = client.post('/ai/chat', json={'messages': messages, 'answers': answers}).json()
+    assert turn['type'] == 'result'
+    triage = turn['triage']
+    assert triage['urgency']['level'] == 'green'
+    assert triage['care']['setting'] == 'home'
+    assert triage['care']['steps']
+    assert 'I have a fever' in triage['ai_summary']
+    assert 'home' in triage['ai_summary'].lower()

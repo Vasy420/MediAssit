@@ -30,6 +30,7 @@ interface DashboardData {
     queue_status: string | null;
     preconsult_status?: string | null;
     chief_complaint?: string;
+    ai_summary?: string;
     urgency_guidance?: { level: string; label: string; action: string };
   }[];
   total_today: number;
@@ -151,6 +152,7 @@ export default function DoctorDashboardScreen() {
                 <Text style={[styles.apptDate, { color: theme.inkMuted }]}>Date: {new Date(`${appt.date}T00:00:00`).toLocaleDateString()}</Text>
                 <Text style={[styles.apptStatus, { color: theme.inkMuted }]}>Status: {appt.status.replace(/_/g, ' ')}</Text>
                 {appt.chief_complaint ? <Text style={[styles.apptStatus, { color: theme.inkMuted }]}>Complaint: {appt.chief_complaint}</Text> : null}
+                {appt.ai_summary ? <Text style={[styles.apptStatus, { color: theme.inkMuted }]} numberOfLines={4}>AI summary: {appt.ai_summary}</Text> : null}
                 {appt.urgency_guidance?.action ? <Text style={[styles.apptQueue, { color: theme.primary }]}>{appt.urgency_guidance.action}</Text> : null}
                 {appt.preconsult_status ? <Text style={[styles.apptQueue, { color: theme.primary }]}>Pre-consult: {appt.preconsult_status.replace(/_/g, ' ')}</Text> : null}
                 {appt.queue_position && (

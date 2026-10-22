@@ -1,5 +1,10 @@
 export type UrgencyLevel = 'green' | 'yellow' | 'orange' | 'red';
 
+export interface TriageCare {
+  setting: 'home' | 'doctor' | 'emergency';
+  steps: string[];
+}
+
 export interface TriageResult {
   symptoms: { name: string; category: string }[];
   duration: { label: string; days?: number };
@@ -15,6 +20,8 @@ export interface TriageResult {
   warning_signs: string[];
   reason: string;
   disclaimer: string;
+  care: TriageCare;
+  ai_summary: string;
 }
 
 export interface TriageQuestionOut {
@@ -22,6 +29,7 @@ export interface TriageQuestionOut {
   key: string;
   text: string;
   rephrased: boolean;
+  lead?: string;
   options: { id: string; key: string; text: string; emoji: string }[];
 }
 

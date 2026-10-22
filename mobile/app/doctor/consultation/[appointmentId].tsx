@@ -14,7 +14,7 @@ import { TextField } from '../../../src/ui/TextField';
 import { colors, layout, spacing, typography } from '../../../src/ui/theme';
 
 interface ConsultationData {
-  appointment: { appointment_id: string; date: string; time: string; reason?: string; status: string; urgency?: string };
+  appointment: { appointment_id: string; date: string; time: string; reason?: string; ai_summary?: string; status: string; urgency?: string };
   patient: {
     patient_id: string;
     name: string;
@@ -192,6 +192,7 @@ export default function ConsultationScreen() {
             </Text>
           ))}
           {summary?.vital_signs?.temperature ? <Text style={styles.field}>Temperature: {summary.vital_signs.temperature}</Text> : null}
+          {data.appointment.ai_summary ? <Text style={styles.body}>Chat AI summary: {data.appointment.ai_summary}</Text> : null}
           {data.appointment.reason ? <Text style={styles.field}>Visit reason: {data.appointment.reason}</Text> : null}
         </Card>
         </FadeSlide>

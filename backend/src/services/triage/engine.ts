@@ -32,7 +32,7 @@ const DISCLAIMER =
 /* ------------------------- helpers ------------------------- */
 
 function patientTexts(messages: { role: string; text: string }[]): string[] {
-  return messages.filter((m) => m.role === 'patient').map((m) => m.text);
+  return messages.filter((m) => (m.role === 'patient' || m.role === 'user') && m.text).map((m) => m.text);
 }
 
 function wordList(texts: string[]): string {
@@ -369,27 +369,90 @@ const SIMPLE_REASONS: Record<string, string> = {
 const SIMPLE_FALLBACK_REASON =
   'See a general doctor (family doctor). They will check you and tell you what to do.';
 
-function buildFallbackGeneral(simple: boolean): TriageResult {
+const HOME_STEPS: Record<string, string[]> = {
+  fever: [
+    'Rest and drink water often.',
+    'Keep the room cool and wear light clothes.',
+    'See a doctor if the fever lasts more than two days, gets very high, or comes with a stiff neck, rash, confusion, or trouble breathing.',
+  ],
+  stomach: [
+    'Take small sips of water and eat plain food if you can.',
+    'Rest until the pain settles.',
+    'See a doctor if the pain is severe, you cannot keep fluids down, or there is blood.',
+  ],
+  head: [
+    'Rest in a quiet room and drink water.',
+    'See a doctor if the headache is sudden and severe, or comes with vision changes, weakness, or a stiff neck.',
+  ],
+  ent: [
+    'Rest, drink water, and avoid smoke and dust.',
+    'See a doctor if swallowing becomes hard, the pain is only on one side, or it is not better in a few days.',
+  ],
+  general: [
+    'Rest and drink water.',
+    'See a doctor if it gets worse, spreads, or is not better in two days.',
+  ],
+};
+
+const CARE_LINE = {
+  home: 'Look after this at home unless it gets worse.',
+  doctor: 'Book a doctor appointment.',
+  emergency: 'This needs urgent care, not a routine home plan.',
+};
+
+function withCare(result: TriageResult, texts: string[], cats: string[], simple: boolean): TriageResult {
+  const urgency = result.urgency.level;
+  const setting = urgency === 'red' ? 'emergency' : urgency === 'orange' || urgency === 'yellow' ? 'doctor' : 'home';
+  const steps = setting === 'home' ? [...(HOME_STEPS[cats[0] ?? ''] ?? HOME_STEPS.general)] : [];
+  const reason =
+    setting === 'home' && !simple
+      ? `This looks like something you can look after at home for now. ${result.reason}`.trim()
+      : result.reason;
+  const said = texts.map((text) => text.trim()).filter(Boolean).join(' ');
+  const names =
+    result.symptoms.map((item) => item.name).filter(Boolean).join(', ') || cats.join(', ') || 'not named';
+  const specialty = result.recommended_specialties[0]?.specialty || 'General Physician';
+  const warnings = result.warning_signs.join(' ') || 'None reported.';
   return {
-    symptoms: [],
-    duration: { label: simple ? 'Not clear yet' : 'Duration not clear yet' },
-    severity: { level: 'mild', label: 'Mild' },
-    urgency: { level: 'green', label: 'Routine' },
-    recommended_specialties: [
-      {
-        code: 'D001',
-        specialty: 'General Physician',
-        department: 'General Medicine',
-        relevance: 1,
-      },
-    ],
-    emergency_flag: false,
-    warning_signs: [],
-    reason: simple
-      ? SIMPLE_FALLBACK_REASON
-      : 'Since we could not identify a specific problem, we recommend starting with a general physician who can guide you further.',
-    disclaimer: DISCLAIMER,
+    ...result,
+    reason,
+    care: { setting, steps },
+    ai_summary:
+      `Patient said: ${said || 'No description yet.'} ` +
+      `Symptoms: ${names}. Severity: ${result.severity.label}. Duration: ${result.duration.label}. ` +
+      `Decision: ${CARE_LINE[setting]} ` +
+      `Suggested specialty: ${specialty}. Warning signs: ${warnings}`,
   };
+}
+
+function buildFallbackGeneral(simple: boolean): TriageResult {
+  return withCare(
+    {
+      symptoms: [],
+      duration: { label: simple ? 'Not clear yet' : 'Duration not clear yet' },
+      severity: { level: 'mild', label: 'Mild' },
+      urgency: { level: 'green', label: 'Routine' },
+      recommended_specialties: [
+        {
+          code: 'D001',
+          specialty: 'General Physician',
+          department: 'General Medicine',
+          relevance: 1,
+        },
+      ],
+      emergency_flag: false,
+      warning_signs: [],
+      reason: simple
+        ? SIMPLE_FALLBACK_REASON
+        : 'Since we could not identify a specific problem, we recommend starting with a general physician who can guide you further.',
+      disclaimer: DISCLAIMER,
+      care: { setting: 'home', steps: [] },
+      ai_summary: '',
+    },
+    [],
+    [],
+    simple,
+  );
 }
 
 function buildResult(
@@ -429,18 +492,27 @@ function buildResult(
   }
   if (simple) reason = SIMPLE_REASONS[urgency];
 
-  return {
-    symptoms: extractSymptoms(texts),
-    duration: onset,
-    severity: { level: sevLevel, label: SEVERITIES[sevLevel] },
-    urgency: { level: urgency, label: URGENCY_LABEL[urgency] },
-    recommended_specialties: computeSpecialties(cats, patient),
-    emergency_flag: urgency === 'red',
-    warning_signs: warnSigns,
-    reason,
-    disclaimer: DISCLAIMER,
-  };
-}/**
+  return withCare(
+    {
+      symptoms: extractSymptoms(texts),
+      duration: onset,
+      severity: { level: sevLevel, label: SEVERITIES[sevLevel] },
+      urgency: { level: urgency, label: URGENCY_LABEL[urgency] },
+      recommended_specialties: computeSpecialties(cats, patient),
+      emergency_flag: urgency === 'red',
+      warning_signs: warnSigns,
+      reason,
+      disclaimer: DISCLAIMER,
+      care: { setting: 'home', steps: [] },
+      ai_summary: '',
+    },
+    texts,
+    cats,
+    simple,
+  );
+}
+
+/**
  * Main adaptive conversation driver.
  * Returns either the next single question, or the final triage result
  * when enough information has been collected.

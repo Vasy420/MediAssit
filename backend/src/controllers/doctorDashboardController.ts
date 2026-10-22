@@ -66,6 +66,7 @@ export async function handleDoctorDashboard(req: Request, res: Response) {
       queue_status: queue?.status ?? null,
       preconsult_status: preconsult?.status ?? null,
       chief_complaint: preconsult?.chief_complaint || a.reason || '',
+      ai_summary: a.ai_summary || '',
       urgency_guidance: guidanceFor(a.urgency),
     };
   });
@@ -227,6 +228,7 @@ export async function handleConsultation(req: Request, res: Response) {
         date: appointment.date,
         time: appointment.time,
         reason: appointment.reason,
+        ai_summary: appointment.ai_summary || '',
         status: appointment.status,
         urgency: appointment.urgency,
       },

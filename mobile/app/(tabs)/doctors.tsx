@@ -13,6 +13,7 @@ import { Screen } from '../../src/ui/Screen';
 import { StatusBadge } from '../../src/ui/StatusBadge';
 import { TextField } from '../../src/ui/TextField';
 import { colors, layout, radii, spacing, typography } from '../../src/ui/theme';
+import { takePendingVisit, type PendingVisit } from '../../src/services/visitHandoff';
 
 interface BackendDoctor {
   doctor_id: string;
@@ -82,6 +83,7 @@ export default function DoctorsScreen() {
   const [bookingError, setBookingError] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [suggestions, setSuggestions] = useState<SlotRecommendation[]>([]);
+  const [handoff, setHandoff] = useState<PendingVisit | null>(null);
 
   const visibleDoctors = testMode
     ? [...fakeDoctors, ...doctors.filter((doctor) => !doctor.doctor_id.startsWith('FAKE-'))]
@@ -135,9 +137,11 @@ export default function DoctorsScreen() {
 
   const openBooking = (doctor: Doctor, preset?: { date?: string; time?: string }) => {
     const date = preset?.date || nextBookableDate();
+    const pending = takePendingVisit();
+    setHandoff(pending);
     setSelectedDoctor(doctor);
     setBookingDate(date);
-    setReason('General consultation');
+    setReason(pending?.reason || 'General consultation');
     setBookingError('');
     setShowDatePicker(false);
     setBookingTime(preset?.time ?? null);
@@ -163,6 +167,7 @@ export default function DoctorsScreen() {
     if (!bookingDoctor) {
       setShowDatePicker(false);
       setSelectedDoctor(null);
+      setHandoff(null);
     }
   };
 
@@ -191,7 +196,8 @@ export default function DoctorsScreen() {
           hospital: selectedDoctor.hospital || undefined,
           status: 'confirmed',
           reason: reason.trim(),
-          urgency: 'green',
+          ai_summary: handoff?.aiSummary || undefined,
+          urgency: handoff?.urgency || 'green',
           is_fake: true,
         };
         addFakeAppointment(fakeAppointment);
@@ -203,10 +209,14 @@ export default function DoctorsScreen() {
           time: bookingTime,
           hospital: selectedDoctor.hospital || undefined,
           reason: reason.trim(),
+          urgency: handoff?.urgency,
+          conversation_id: handoff?.conversationId,
+          ai_summary: handoff?.aiSummary,
         });
         Alert.alert('Appointment request submitted', `Your appointment with ${selectedDoctor.user.name} is scheduled for ${bookingDate} at ${bookingTime}.`);
       }
       setSelectedDoctor(null);
+      setHandoff(null);
     } catch (error) {
       const message = (error as Error).message || 'Could not schedule appointment.';
       setBookingError(message);
@@ -324,6 +334,12 @@ export default function DoctorsScreen() {
                 <Text style={[styles.presetLabel, { color: theme.inkMuted }]}>Hospital / clinic</Text>
                 <Text style={[styles.presetValue, { color: theme.primaryDark }]}>{selectedDoctor?.hospital || 'Doctor has not added a clinic yet'}</Text>
               </View>
+              {handoff?.aiSummary ? (
+                <View style={[styles.locationCard, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+                  <Text style={[styles.presetLabel, { color: theme.inkMuted }]}>AI summary for the doctor</Text>
+                  <Text style={[styles.presetValue, { color: theme.ink }]}>{handoff.aiSummary}</Text>
+                </View>
+              ) : null}
               <TextField label="Reason for visit" placeholder="What do you need help with?" value={reason} onChangeText={(value) => { setReason(value); setBookingError(''); }} multiline containerStyle={styles.modalField} />
               {bookingError ? <Text style={[styles.bookingError, { color: theme.danger }]}>{bookingError}</Text> : null}
               <Button title={selectedDoctor?.doctor_id.startsWith('FAKE-') ? 'Add fake appointment' : 'Confirm appointment'} icon="checkmark-outline" size="lg" onPress={handleConfirmBooking} loading={bookingDoctor !== null} disabled={bookingDoctor !== null} />

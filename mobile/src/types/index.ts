@@ -33,6 +33,7 @@ export interface Appointment {
   hospital?: string;
   status: 'pending' | 'scheduled' | 'confirmed' | 'in_queue' | 'in_consultation' | 'cancelled' | 'completed' | 'no_show';
   reason?: string;
+  ai_summary?: string;
   urgency?: 'green' | 'yellow' | 'orange' | 'red';
   is_fake?: boolean;
 }
@@ -81,6 +82,7 @@ export interface TriageQuestion {
     key: string;
     text: string;
     rephrased: boolean;
+    lead?: string;
     options: { id: string; key: string; text: string; emoji: string }[];
   };
   done: boolean;
@@ -98,6 +100,8 @@ export interface TriageResult {
     warning_signs: string[];
     reason: string;
     disclaimer: string;
+    care?: { setting: 'home' | 'doctor' | 'emergency'; steps: string[] };
+    ai_summary?: string;
   };
 }
 
@@ -157,6 +161,7 @@ export interface DoctorDashboardData {
     queue_status: string | null;
     preconsult_status?: string | null;
     chief_complaint?: string;
+    ai_summary?: string;
     urgency_guidance?: UrgencyGuidance;
   }[];
   total_today: number;

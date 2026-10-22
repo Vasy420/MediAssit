@@ -8,6 +8,7 @@ const appointmentSchema = new Schema({
   time: { type: String, required: true },
   hospital: { type: String, default: '' },
   reason: { type: String, default: '' },
+  ai_summary: { type: String, default: '' },
   urgency: { type: String, enum: ['green', 'yellow', 'orange', 'red'], default: 'green' },
   status: {
     type: String,

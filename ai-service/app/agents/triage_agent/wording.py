@@ -1,9 +1,9 @@
 """Let Groq talk like a short clinic chat. The question tree stays in charge.
 
-A question turn may become two or three sentences: a reply to what the patient
-just said, then the same question. A result may become a short closing message
-with the same guidance. Option ids, urgency, the emergency flag, and specialties
-stay untouched. A failed, slow, or off-script reply keeps the original text.
+A question keeps its own sentence and buttons. Groq may add one acknowledgment
+above it. A result may become a short closing message with the same guidance.
+Option ids, urgency, the emergency flag, care setting, and specialties stay
+untouched. A failed, slow, or off-script reply keeps the original text.
 """
 from __future__ import annotations
 
@@ -18,20 +18,19 @@ _POLISH_TIMEOUT = 8.0
 _MAX_CHARS = 520
 _SENTENCE_END = re.compile(r'[.!?]+')
 
-_QUESTION_SYSTEM = (
-    'You are a clinic chat assistant. The next question and its answer buttons are already chosen. '
-    'Write two short sentences, like a person texting. '
-    'First, reply to what the patient just said, without adding symptoms, advice, a diagnosis, or a medicine. '
-    'Second, ask the required question in plain language. It must mean the same thing, so the buttons still answer it. '
-    'Do not ask a different question. Return only those sentences, with no quotes.'
+_LEAD_SYSTEM = (
+    'You are a clinic chat assistant. '
+    'Write one short sentence that shows you heard the patient. '
+    'Do not ask a question. Do not give advice, a diagnosis, or a medicine. '
+    'Do not name a new symptom. The app asks the next question itself. '
+    'Return only that sentence, with no quotes.'
 )
 
-_SIMPLE_QUESTION_SYSTEM = (
+_SIMPLE_LEAD_SYSTEM = (
     'You are a clinic chat assistant using very easy words. '
-    'Write at most two short sentences. '
-    'First, show you heard the patient. Second, ask the required question. '
-    'Do not add advice, a diagnosis, a medicine, or a different question. '
-    'Return only those sentences.'
+    'Write one short sentence that shows you heard the patient. '
+    'Do not ask a question. Do not give advice, a diagnosis, or a medicine. '
+    'Return only that sentence.'
 )
 
 _REASON_SYSTEM = (
@@ -55,27 +54,19 @@ def _patient_lines(messages: list[dict]) -> str:
     return '\n'.join(lines[-4:])
 
 
-def _option_labels(question: dict) -> str:
-    labels: list[str] = []
-    for option in question.get('options') or []:
-        if not isinstance(option, dict):
-            continue
-        label = ' '.join(str(option.get('text') or '').split())
-        if label:
-            labels.append(label)
-    return ', '.join(labels[:8])
-
-
-def _clean(text: str, *, require_question: bool) -> str:
+def _clean(text: str, *, require_question: bool, lead: bool = False) -> str:
     sentence = ' '.join(text.replace('\n', ' ').split()).strip().strip('"').strip("'")
     if not sentence or sentence.startswith('{') or sentence.startswith('```'):
         return ''
-    if len(sentence) < 8 or len(sentence) > _MAX_CHARS:
+    limit = 220 if lead else _MAX_CHARS
+    if len(sentence) < 8 or len(sentence) > limit:
+        return ''
+    if lead and '?' in sentence:
         return ''
     if require_question and '?' not in sentence:
         return ''
     endings = _SENTENCE_END.findall(sentence)
-    if not endings or len(endings) > 4:
+    if not endings or len(endings) > (1 if lead else 4):
         return ''
     lowered = sentence.lower()
     if 'diagnos' in lowered or 'prescri' in lowered:
@@ -83,14 +74,14 @@ def _clean(text: str, *, require_question: bool) -> str:
     return sentence
 
 
-def _rewrite(system: str, user: str, *, require_question: bool) -> str:
+def _rewrite(system: str, user: str, *, require_question: bool, lead: bool = False) -> str:
     return _clean(llm.chat_completion(
         system=system,
         user=user,
         temperature=0.4,
         max_tokens=220,
         timeout=_POLISH_TIMEOUT,
-    ), require_question=require_question)
+    ), require_question=require_question, lead=lead)
 
 
 def polish_turn(turn: dict, messages: list[dict], simple: bool = False) -> dict:
@@ -103,18 +94,14 @@ def polish_turn(turn: dict, messages: list[dict], simple: bool = False) -> dict:
             original = str(turn['question'].get('text') or '').strip()
             if not original:
                 return turn
-            buttons = _option_labels(turn['question'])
-            rewritten = _rewrite(
-                _SIMPLE_QUESTION_SYSTEM if simple else _QUESTION_SYSTEM,
-                (
-                    f'Required question: {original}\n'
-                    f'Buttons: {buttons or "(none)"}\n\n'
-                    f'What the patient already said:\n{said or "(nothing yet)"}'
-                ),
-                require_question=True,
+            lead = _rewrite(
+                _SIMPLE_LEAD_SYSTEM if simple else _LEAD_SYSTEM,
+                f'What the patient already said:\n{said or "(nothing yet)"}',
+                require_question=False,
+                lead=True,
             )
-            if rewritten:
-                turn['question']['text'] = rewritten
+            if lead:
+                turn['question']['lead'] = lead
         elif turn.get('type') == 'result' and isinstance(turn.get('triage'), dict):
             triage = turn['triage']
             original = str(triage.get('reason') or '').strip()

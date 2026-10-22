@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, Pressable, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Animated, Alert,
 } from 'react-native';
@@ -11,6 +11,7 @@ import { Button } from '../../src/ui/Button';
 import { BubbleIn, FadeSlide, ScaleIn, TypingDots } from '../../src/ui/motion';
 import { Screen } from '../../src/ui/Screen';
 import { ServerStatus } from '../../src/ui/ServerStatus';
+import { setPendingVisit } from '../../src/services/visitHandoff';
 import { StatusBadge } from '../../src/ui/StatusBadge';
 import { fonts, layout, radii, spacing, typography } from '../../src/ui/theme';
 import {
@@ -25,10 +26,34 @@ interface Message {
   id: string;
   type: 'question' | 'answer' | 'result' | 'user' | 'error';
   content: string;
+  lead?: string;
   rephrased?: boolean;
   options?: { id: string; key: string; text: string; emoji: string }[];
   triage?: TriageResult['triage'];
 }
+
+type ChatPayload = ChatTurn & { conversation_id?: string };
+
+function careSetting(triage: TriageResult['triage']): 'home' | 'doctor' | 'emergency' {
+  const setting = triage.care?.setting;
+  if (setting === 'home' || setting === 'doctor' || setting === 'emergency') return setting;
+  if (triage.emergency_flag || triage.urgency.level === 'red') return 'emergency';
+  if (triage.urgency.level === 'green') return 'home';
+  return 'doctor';
+}
+
+function visitReason(triage: TriageResult['triage']): string {
+  const names = triage.symptoms.map((item) => item.name).filter(Boolean).join(', ');
+  const detail = [triage.severity?.label, triage.duration?.label].filter(Boolean).join(', ');
+  const label = names || 'Symptom check';
+  return detail ? `${label} (${detail})` : label;
+}
+
+const CARE_HEADLINE = {
+  home: 'This looks manageable at home for now.',
+  doctor: 'A doctor should see you.',
+  emergency: 'This needs urgent care.',
+};
 
 const STARTERS = [
   { label: 'Fever', text: 'I have a fever' },
@@ -54,9 +79,16 @@ export default function AIChatScreen() {
   const [listening, setListening] = useState(false);
   const voiceAvailable = speechRecognitionAvailable();
   const flatListRef = useRef<FlatList<Message> | null>(null);
+  const conversationIdRef = useRef('');
   const sendScale = useRef(new Animated.Value(0.9)).current;
   const started = messages.length > 0;
   const canSend = Boolean(input.trim()) && !loading;
+  const activeQuestionId = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index].type === 'question') return messages[index].id;
+    }
+    return '';
+  }, [messages]);
 
   useEffect(() => {
     Animated.spring(sendScale, { toValue: canSend ? 1 : 0.9, friction: 6, tension: 120, useNativeDriver: true }).start();
@@ -75,6 +107,7 @@ export default function AIChatScreen() {
         id: uid('q'),
         type: 'question',
         content: turn.question.text,
+        lead: turn.question.lead,
         rephrased: turn.question.rephrased,
         options: turn.question.options,
       });
@@ -97,13 +130,15 @@ export default function AIChatScreen() {
 
     setLoading(true);
     try {
-      const res = await api.post<ChatTurn>('/api/ai/chat', {
+      const res = await api.post<ChatPayload>('/api/ai/chat', {
         message: msg,
         answers,
         simple,
+        conversation_id: conversationIdRef.current || undefined,
       });
-      const turn = res.data as unknown as ChatTurn;
-      if (turn) handleTurn(turn);
+      const turn = res.data as ChatPayload | undefined;
+      if (turn?.conversation_id) conversationIdRef.current = turn.conversation_id;
+      if (turn?.type) handleTurn(turn);
     } catch {
       addMessage({ id: uid('error'), type: 'error', content: 'The symptom check is unavailable right now. Try again in a moment.' });
     } finally {
@@ -122,19 +157,36 @@ export default function AIChatScreen() {
 
     setLoading(true);
     try {
-      const payload: Record<string, unknown> = { answers: updatedAnswers, simple };
+      const payload: Record<string, unknown> = {
+        answers: updatedAnswers,
+        simple,
+        conversation_id: conversationIdRef.current || undefined,
+      };
       if (categoryAnswer && categoryAnswer !== 'not_sure') {
         payload.message = `I have a ${categoryAnswer} problem`;
       }
-      const res = await api.post<ChatTurn>('/api/ai/chat', payload);
-      const turn = res.data as unknown as ChatTurn;
-      if (turn) handleTurn(turn);
+      const res = await api.post<ChatPayload>('/api/ai/chat', payload);
+      const turn = res.data as ChatPayload | undefined;
+      if (turn?.conversation_id) conversationIdRef.current = turn.conversation_id;
+      if (turn?.type) handleTurn(turn);
     } catch {
       addMessage({ id: uid('error'), type: 'error', content: 'Something went wrong. Please try again.' });
     } finally {
       setLoading(false);
     }
   }, [answers, loading, simple, addMessage, handleTurn]);
+
+  const bookFromChat = useCallback((triage: TriageResult['triage']) => {
+    const level = triage.urgency.level;
+    const urgency = level === 'green' || level === 'yellow' || level === 'orange' || level === 'red' ? level : undefined;
+    setPendingVisit({
+      conversationId: conversationIdRef.current || undefined,
+      aiSummary: triage.ai_summary || '',
+      reason: visitReason(triage),
+      urgency,
+    });
+    router.navigate('/(tabs)/doctors');
+  }, [router]);
 
   const handleVoiceToggle = useCallback(async () => {
     if (listening) {
@@ -187,27 +239,37 @@ export default function AIChatScreen() {
 
     if (item.type === 'result' && item.triage) {
       const triage = item.triage;
+      const setting = careSetting(triage);
       const urgency = triage.urgency.level;
       const tone = urgency === 'red' ? 'danger' : urgency === 'green' ? 'success' : 'warning';
+      const steps = setting === 'home' ? triage.care?.steps ?? [] : [];
       return (
         <BubbleIn side="bot" style={[styles.resultCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.resultTop}>
             <Text style={[styles.resultKicker, { color: theme.inkMuted }]}>Care guidance</Text>
             <StatusBadge label={triage.urgency.label} tone={tone} />
           </View>
+          <Text style={[styles.resultReason, { color: theme.ink }]}>{CARE_HEADLINE[setting]}</Text>
           <Text style={[styles.resultReason, { color: theme.ink }]}>{triage.reason}</Text>
+          {steps.map((step) => (
+            <Text key={step} style={[styles.step, { color: theme.ink }]}>{`\u2022 ${step}`}</Text>
+          ))}
           {triage.recommended_specialties.length > 0 ? (
             <Text style={[styles.resultMeta, { color: theme.inkMuted }]}>
               Suggested: {triage.recommended_specialties.map((s) => s.specialty).join(', ')}
             </Text>
           ) : null}
-          {triage.emergency_flag ? (
+          {setting === 'emergency' ? (
             <Text style={[styles.resultEmergency, { color: theme.danger }]}>If this feels severe, seek emergency care now.</Text>
           ) : null}
           <Text style={[styles.resultDisclaimer, { color: theme.inkSubtle }]}>{triage.disclaimer}</Text>
-          {triage.recommended_specialties.length > 0 ? (
-            <Button title="Find a doctor" icon="medical-outline" style={styles.bookBtn} onPress={() => router.navigate('/(tabs)/doctors')} />
-          ) : null}
+          <Button
+            title={setting === 'home' ? 'Book a doctor anyway' : 'Book a doctor'}
+            icon="medical-outline"
+            variant={setting === 'home' ? 'secondary' : 'primary'}
+            style={styles.bookBtn}
+            onPress={() => bookFromChat(triage)}
+          />
         </BubbleIn>
       );
     }
@@ -218,10 +280,11 @@ export default function AIChatScreen() {
           <Ionicons name="medkit" size={14} color={theme.primary} />
         </View>
         <View style={[styles.botBubble, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          {item.lead ? <Text style={[styles.lead, { color: theme.inkMuted }]}>{item.lead}</Text> : null}
           <View style={styles.botTextRow}>
             <Text style={[styles.bubbleText, { color: theme.ink, flex: 1 }]}>{item.content}</Text>
             <Pressable
-              onPress={() => handleSpeakBot(item.content)}
+              onPress={() => handleSpeakBot(item.lead ? `${item.lead} ${item.content}` : item.content)}
               accessibilityRole="button"
               accessibilityLabel="Read aloud"
               style={({ pressed }) => [styles.speakBtn, { backgroundColor: theme.primarySoft }, pressed && styles.pressed]}
@@ -229,7 +292,7 @@ export default function AIChatScreen() {
               <Ionicons name="volume-medium" size={14} color={theme.primaryDark} />
             </Pressable>
           </View>
-          {item.options && item.options.length > 0 ? (
+          {item.id === activeQuestionId && item.options && item.options.length > 0 ? (
             <View style={styles.options}>
               {item.options.map((opt) => (
                 <Pressable
@@ -252,7 +315,7 @@ export default function AIChatScreen() {
         </View>
       </BubbleIn>
     );
-  }, [handleOptionSelect, handleSpeakBot, loading, router, simple, theme]);
+  }, [activeQuestionId, bookFromChat, handleOptionSelect, handleSpeakBot, loading, simple, theme]);
 
   return (
     <Screen padded={false}>
@@ -419,6 +482,8 @@ const styles = StyleSheet.create({
   userBubble: { maxWidth: '82%', borderRadius: 18, borderTopRightRadius: 6, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   assistCard: { borderRadius: 16, padding: spacing.lg, borderWidth: 1, marginBottom: spacing.md },
   bubbleText: { ...typography.body },
+  lead: { ...typography.caption, marginBottom: spacing.xs },
+  step: { ...typography.body, marginTop: spacing.xs },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   option: { minHeight: 40, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, justifyContent: 'center' },
   optionText: { ...typography.label },

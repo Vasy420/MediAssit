@@ -24,6 +24,8 @@ export async function handleCreateAppointment(req: Request, res: Response) {
     hospital: req.body.hospital as string | undefined,
     reason: req.body.reason as string | undefined,
     urgency: req.body.urgency as 'green' | 'yellow' | 'orange' | 'red' | undefined,
+    conversation_id: req.body.conversation_id as string | undefined,
+    ai_summary: req.body.ai_summary as string | undefined,
   });
   const queue = isPatient ? await joinQueue(result.appointment.appointment_id) : null;
 

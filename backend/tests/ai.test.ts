@@ -174,6 +174,57 @@ test('POST /api/ai/chat simple mode uses plain wording and tolerant answer keys'
   assert.strictEqual(turn.triage.reason, 'No hurry. You can see a doctor when it is convenient for you.');
 });
 
+test('POST /api/ai/chat follows a named fever into home care', async () => {
+  const token = await patientToken('ai-fever@test.com');
+  const headers = { Authorization: 'Bearer ' + token };
+  let r = await request(app())
+    .post('/api/ai/chat')
+    .set(headers)
+    .send({ message: 'I have a fever' });
+  let turn = r.body.data;
+  assert.strictEqual(turn.type, 'question');
+  assert.strictEqual(turn.question.id, 'Q_fever_severity');
+  const conversation_id = turn.conversation_id;
+
+  r = await request(app())
+    .post('/api/ai/chat')
+    .set(headers)
+    .send({ conversation_id, answers: [{ key: 'Q_fever_severity', answer: 'little' }] });
+  turn = r.body.data;
+  assert.strictEqual(turn.question.id, 'Q_fever_onset');
+
+  r = await request(app())
+    .post('/api/ai/chat')
+    .set(headers)
+    .send({
+      conversation_id,
+      answers: [
+        { key: 'Q_fever_severity', answer: 'little' },
+        { key: 'Q_fever_onset', answer: 'today' },
+      ],
+    });
+  turn = r.body.data;
+  assert.strictEqual(turn.question.id, 'Q_fever_assoc');
+
+  r = await request(app())
+    .post('/api/ai/chat')
+    .set(headers)
+    .send({
+      conversation_id,
+      answers: [
+        { key: 'Q_fever_severity', answer: 'little' },
+        { key: 'Q_fever_onset', answer: 'today' },
+        { key: 'Q_fever_assoc', answer: 'chills' },
+      ],
+    });
+  turn = r.body.data;
+  assert.strictEqual(turn.type, 'result');
+  assert.strictEqual(turn.triage.urgency.level, 'green');
+  assert.strictEqual(turn.triage.care.setting, 'home');
+  assert.ok(turn.triage.care.steps.length > 0);
+  assert.ok(String(turn.triage.ai_summary).includes('I have a fever'));
+});
+
 test('POST /api/ai/chat detects Telugish keywords', async () => {
   const token = await patientToken('ai-telugu@test.com');
   const headers = { Authorization: 'Bearer ' + token };
